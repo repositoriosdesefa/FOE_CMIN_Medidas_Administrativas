@@ -1,0 +1,2587 @@
+---
+title-meta: "Reporte de SEFA"
+author-meta: "Sefa"
+date-meta: '\today'
+lang: es
+documentclass: article
+classoption: oneside
+keywords: "informe, r studio, r markdown, SEFA"
+geometry:
+- top=2cm
+- left=2.5cm
+- right=2.5cm
+- bottom=3.5cm
+papersize: a4
+fontsize: 11pt
+header-includes:
+- \usepackage[title,titletoc]{appendix}
+- \usepackage{lscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+- \newcommand{\Rlogo}{\protect\includegraphics[height=1.8ex,keepaspectratio]{Rlogo.png}}
+## - \newcommand{\FIRMA1}{\protect\includegraphics[height=4ex,keepaspectratio]{FIRMA1.png}}
+- \usepackage{floatrow}
+- \floatplacement{figure}{H}
+- \floatplacement{table}{H}
+- \floatsetup[figure]{capposition=top}
+- \floatsetup[table]{capposition=top}
+- \addtolength{\skip\footins}{1pc plus 2pt}
+- \usepackage{titlesec}
+- \titleformat*{\section}{\filright \normalsize \bfseries}
+- \titleformat*{\subsection}{\normalsize\bfseries}
+- \titleformat*{\subsubsection}{\normalsize\bfseries}
+- \renewcommand{\thesection}{\Roman{section}}
+- \renewcommand{\thesubsection}{\Alph{subsection}}
+- \usepackage{helvet}
+- \renewcommand{\familydefault}{\sfdefault}
+- \usepackage{colortbl}
+- \usepackage{array}
+- \usepackage{graphicx}
+- \usepackage{hhline,colortbl}
+- \usepackage{fancyhdr}
+- \pagestyle{fancy}
+- \setlength{\headheight}{64pt}
+- \fancyhf{}
+- \renewcommand{\headrulewidth}{0pt}
+- \fancyhead[C]{\setlength{\arrayrulewidth}{0.35mm} \arrayrulecolor{white} \begin{tabular} { | >{\arraybackslash}m{1cm} | >{\arraybackslash}m{1cm} | >{\arraybackslash}m{2cm} | >{\arraybackslash}m{3.75cm} | >{\arraybackslash}m{6cm} |} \includegraphics[width=1cm]{peru} & \cellcolor{red} \textcolor{white}{PERÚ} & \cellcolor[gray]{0.2} \scriptsize \textcolor{white}{Ministerio del Ambiente} & \cellcolor[gray]{0.5} \scriptsize \textcolor{white}{Organismo de Evaluación y Fiscalización Ambiental} &  \cellcolor[gray]{0.5} \scriptsize \textcolor{white}{Subdirección de Seguimiento de Entidades de Fiscalización Ambiental} \\ \end{tabular}\\ \vspace{2mm}{\scriptsize "Decenio de la igualdad de oportunidades para mujeres y hombres"}\\ {\scriptsize "Año del Bicentenario del Perú{:} 200 años de Independencia"}} 
+- \fancyfoot[C]{\thepage}
+mainfont: helvet
+output: 
+  pdf_document:
+    fig_caption: true
+    number_sections: true
+    toc: no
+---
+```{r setup_1, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+
+## I. Librerías ----
+library(googledrive)
+library(googlesheets4)
+library(lubridate)
+library(ggeasy)
+library(ggplot2)
+library(shadowtext)
+library(tidyr)
+library(dplyr)
+library(reshape)
+library(reshape2)
+library(stringr)
+library(knitr)
+library(kableExtra)
+library(readxl)
+library(bizdays)
+library(viridis)
+
+# II. Parámetros ----
+# Colores principales
+OEFA.AZUL1<-c("#144AA7")
+OEFA.AZUL2<-c("#1d85bf")
+OEFA.TURQUEZA<-c("#0BC7E0")
+OEFA.JADE<-c("#44bfb5")
+OEFA.VERDE<-c("#8CCD3A")
+OEFA.GRIS<-c("#696A6A")
+OEFA.MOSTAZA<-c("#FFB500")
+
+# Colores secundarios
+OEFA.HUMO<-c("#BCBCBC")
+OEFA.LIMON<-c("#D5CB00")
+OEFA.MORADO<-c("#4F4898")
+OEFA.FUCSIA<-c("#E83670")
+OEFA.NARANJA<-c("#EF7911")
+OEFA.ROJO<-c("#EF0C33")
+
+# Paleta
+PALETA.PRINCIPAL <- c(OEFA.AZUL1, OEFA.VERDE,
+                      OEFA.TURQUEZA, OEFA.AZUL2,
+                      OEFA.MOSTAZA, OEFA.JADE,
+                      OEFA.GRIS, OEFA.LIMON)
+
+## Calendario Perú 2020 ----
+  Feriados_en_Peru_2020 <- date(
+    c("2020-01-01",
+      "2020-04-09",
+      "2020-04-10",
+      "2020-05-01",
+      "2020-06-29",
+      "2020-07-28",
+      "2020-08-30",
+      "2020-10-08",
+      "2020-10-09",
+      "2020-11-01",
+      "2020-12-08",
+      "2020-12-25",
+      "2020-12-31"
+    )
+  )
+  Calendario_Peru <- create.calendar(
+    "Calendario_Peru_2020",
+    holidays = Feriados_en_Peru_2020,
+    weekdays = c("saturday", "sunday"),
+    start.date = "2020-01-01",
+    end.date = "2021-12-31",
+    adjust.from = adjust.next,
+    adjust.to = adjust.next,
+    financial = TRUE
+  )
+  rm(Feriados_en_Peru_2020)
+
+## Determinar el periodo comprendido en el informe ----
+som <- function(x) {
+  as.Date(format(x, "%Y-%m-01"))
+}
+Inicio <- som(som(Sys.Date()) - years(1))
+Fin <- som(Sys.Date()) - 1
+Mes_evaluado <- month(Inicio, label=TRUE, abbr = FALSE)
+Mes_evaluado <- str_to_lower(Mes_evaluado)
+MES_EVALUADO <- str_to_upper(Mes_evaluado)
+Mes_actual <- month(now(), label=TRUE, abbr = FALSE)
+Mes_actual <- str_to_lower(Mes_actual)
+
+## Letras de columnas ----
+Letrasdecolumnas <- data.frame(LETTERS)
+Letras <- vector("list", nrow(Letrasdecolumnas))
+for (i in 1:nrow(Letrasdecolumnas)) {
+  Letras[[i]] <- data.frame(rep(Letrasdecolumnas$LETTERS[i], nrow(Letrasdecolumnas)))
+}
+Columna1 <- base::Reduce(function(...) merge(..., all = TRUE), Letras)
+Columna1 <- select(
+  Columna1,
+  "Columna1" = names(Columna1)
+)
+Vacio <- data.frame(rep("", nrow(Letrasdecolumnas)))
+Vacio <- select(
+  Vacio,
+  "Columna1" = names(Vacio)
+)
+Tabla <- merge(Vacio, Columna1, all = TRUE)
+Columna2 <- rep(LETTERS, nrow(Letrasdecolumnas)+1)
+Tabla <- mutate(
+  Tabla,
+  Columna2 = Columna2
+)
+Tabla <- mutate(
+  Tabla,
+  Columna3 = gsub(" ","", paste(Tabla$Columna1, Tabla$Columna2))
+)
+Letrasdecolumnas <- c(Tabla$Columna3)
+rm(
+  Columna1,
+  Letras,
+  Tabla,
+  Vacio,
+  Columna2,
+  i
+)
+
+
+
+
+################################ ###
+####   III. Descargar y trabajar BD   ----
+################################ ###
+
+
+## ===================== -
+## Seteos para descarga 
+## ===================== -
+
+#i) Links de descarga de base de datos de MA
+FUENTE_IMPOSICION<- ""
+FUENTE_SEGUIMIENTO<- ""
+FUENTE_MULTAS<- ""
+
+#SETEANDO NOMBRE ARCHIVO PARA BACKUP
+## archivo1='IMPOSICION.csv'
+## archivo2='SEGUIMIENTOcsv'
+## archivo3='MULTAS.csv'
+
+
+
+#_____________________________________________________________________________________________________
+
+## ================ =
+## BD IMPOSICIONES
+## ================ =
+
+
+## ------------------------------------------- -
+## Descarga Libro y definiendo el diccionario 
+## ------------------------------------------- -
+
+#GENERANDO UN TEMPORAL
+tp1<-tempfile()
+
+#Descargar el libro completo
+download.file(FUENTE_IMPOSICION,tp1,mode ="wb")
+
+#Definir el dicionario general
+DIC<-read_xlsx(path = tp1, sheet = "DIC VARIABLES")
+DIC_TABLA_1=DIC
+COL_IMP=nrow(subset(DIC,DATASET=="1) IMPOSICION MA"))
+COL_ETAP=nrow(subset(DIC,DATASET=="2) ETAPAS"))
+
+
+## --------------------------------- -
+## Descarga Pestaña IMPOSICIONES MA 
+## --------------------------------- -
+
+#Subseteando diccionario
+DIC_IMPOSICION= DIC[DIC$DATASET=="1) IMPOSICION MA"&DIC$`NO RELEVANTE EN SCRIPT`=="FALSE", ] #Selecciono solo el dataset a usar y se eliminan campos irrelevantes
+DIC_IMPOSICION=DIC_IMPOSICION[,c(3:4)] #solo me quedo con los campos en BD y CODIFICACION
+CABECERAS=as.list(DIC_IMPOSICION) #Se crea la lista de las cabeceras a emplearse
+
+## Cargando BD 
+IMPOSICION<-as.data.frame(read_xlsx(tp1,skip = 1, sheet = "1) IMPOSICION MA"))
+IMPOSICION=subset(IMPOSICION,as.Date(IMPOSICION$`FECHA DEL ACTA`)>=Inicio & as.Date(IMPOSICION$`FECHA DEL ACTA`)<=Fin, select = CABECERAS$`CAMPO EN BD`) #Limito los campos con los que se trabajar?
+colnames(IMPOSICION)=CABECERAS$`CODIGO CAMPO` #Renombro las cabeceras seg?n CODIGO CSEP
+IMPOSICION=IMPOSICION[is.na(IMPOSICION$EXP_CMIN)!=T, ]
+
+
+#_____________________________________________________________________________________________________
+
+
+
+## ------------------------ -
+## Descarga Pestaña ETAPAS 
+## ------------------------ -
+
+#Subseteando diccionario
+DIC_ETAPAS= DIC[DIC$DATASET=="2) ETAPAS"&DIC$`NO RELEVANTE EN SCRIPT`=="FALSE", ] #Selecciono solo el dataset a usar y se eliminan campos irrelevantes
+DIC_ETAPAS=DIC_ETAPAS[,c(3:4)] #solo me quedo con los campos en BD y CODIFICACION
+CABECERAS=as.list(DIC_ETAPAS) #Se crea la lista de las cabeceras a emplearse
+
+## Cargando BD 
+ETAPAS<-as.data.frame(read_xlsx(tp1,skip = 0, sheet = "2) ETAPAS"))
+ETAPAS=subset(ETAPAS,as.Date(ETAPAS$`FECHA DEL ACTA`)>=Inicio & as.Date(ETAPAS$`FECHA DEL ACTA`)<=Fin, select = CABECERAS$`CAMPO EN BD`) #Limito los campos con los que se trabajar?
+colnames(ETAPAS)=CABECERAS$`CODIGO CAMPO` #Renombro las cabeceras seg?n CODIGO CSEP
+ETAPAS=ETAPAS[is.na(ETAPAS$COD_ETAPA)!=T, ]
+
+
+###################################
+
+
+
+
+
+
+###################### ###
+####   III.1 BD IMPOSICION   ----
+###################### ###
+
+
+## ====================== -
+## 1) MEDIDAS POR ESTADO 
+## ====================== -
+
+## ---------------- -
+## Generando tabla 
+## ---------------- -
+
+T_ESTADO=IMPOSICION[,c(1,7)] %>%
+  ## subset() %>%
+  group_by(ESTADO) %>%
+  dplyr::summarize(Medidas = n())%>%
+  as.data.frame()
+
+T_ESTADO$Porcentaje=T_ESTADO$Medidas/sum(T_ESTADO$Medidas)
+
+T_ESTADO$ESTADO[T_ESTADO$ESTADO=="EN ELABORACIÓN"]="En elaboración"
+T_ESTADO$ESTADO[T_ESTADO$ESTADO=="RESULTADOS DE LABORATORIO"]="Resultados de laboratorio"
+T_ESTADO$ESTADO[T_ESTADO$ESTADO=="NO AMERITA REALIZAR PROYECTO DE RESOLUCIÓN"]="No amerita realizar \nproyecto de resolución"
+T_ESTADO$ESTADO[T_ESTADO$ESTADO=="TERMINADO"]="Terminado"
+T_ESTADO$ESTADO[T_ESTADO$ESTADO=="EN REVISIÓN DEL COORDINADOR DE ACTIVIDADES"]="En revisión del \ncoordinador de actividades"
+T_ESTADO$ESTADO[T_ESTADO$ESTADO=="EN REVISIÓN PCD"]="En revisión PCD"
+T_ESTADO$ESTADO[T_ESTADO$ESTADO=="PENDIENTE DE FIRMA DSEM"]="Pendiemte de firma DSEM"
+T_ESTADO$ESTADO[T_ESTADO$ESTADO=="EN REVISIÓN DEL ANALISTA LEGAL"]="Revisión de Analista Legal"
+T_ESTADO$ESTADO[T_ESTADO$ESTADO=="REVISIÓN DE ANTECEDENTES"]="Revisión de antecedentes"
+
+T_ESTADO$TIPO=NA
+T_ESTADO$TIPO[T_ESTADO$ESTADO=="En elaboración"]="T_1"
+T_ESTADO$TIPO[T_ESTADO$ESTADO=="Resultados de laboratorio"]="T_2"
+T_ESTADO$TIPO[T_ESTADO$ESTADO=="No amerita realizar \nproyecto de resolución"]="T_3"
+T_ESTADO$TIPO[T_ESTADO$ESTADO=="Terminado"]="T_4"
+T_ESTADO$TIPO[T_ESTADO$ESTADO=="En revisión del \ncoordinador de actividades"]="T_5"
+T_ESTADO$TIPO[T_ESTADO$ESTADO=="En revisión PCD"]="T_6"
+T_ESTADO$TIPO[T_ESTADO$ESTADO=="Revisión de Analista Legal"]="T_7"
+T_ESTADO$TIPO[T_ESTADO$ESTADO=="Revisión de antecedentes"]="T_8"
+
+## ========================== -
+## 2) MEDIDAS CON REQ PREVIO 
+## ========================== -
+
+## ---------------- -
+## Generando tabla 
+## ---------------- -
+
+T_REQ_PREV=IMPOSICION[,c(1,10)] %>%
+  ## subset() %>%
+  group_by(REQ_PROC) %>%
+  dplyr::summarize(Medidas = n())%>%
+  as.data.frame()
+T_REQ_PREV$Porcentaje=T_REQ_PREV$Medidas/sum(T_REQ_PREV$Medidas)
+T_REQ_PREV$REQ_PROC[T_REQ_PREV$REQ_PROC=="NO"]="No"
+T_REQ_PREV$REQ_PROC[T_REQ_PREV$REQ_PROC=="SI"]="Sí"
+
+
+
+
+## ===================== -
+## 3) TIPOS DE PROCESOS 
+## ===================== -
+
+## ---------------- -
+## Generando tabla 
+## ---------------- -
+
+T_PROC_PREV=IMPOSICION[,c(1,11)] %>%
+  subset(PROC_PREV!="NO APLICA") %>%
+  group_by(PROC_PREV) %>%
+  dplyr::summarize(Medidas = n())%>%
+  as.data.frame() 
+
+T_PROC_PREV$Porcentaje=T_PROC_PREV$Medidas/sum(T_PROC_PREV$Medidas)
+T_PROC_PREV$PROC_PREV[T_PROC_PREV$PROC_PREV=="NO APLICA"]="No aplica"
+T_PROC_PREV$PROC_PREV[T_PROC_PREV$PROC_PREV=="RESULTADOS DE LABORATORIO"]="Resultados de\nlaboratorio"
+T_PROC_PREV$PROC_PREV[T_PROC_PREV$PROC_PREV=="REVISIÓN DE ANTECEDENTES"]="Revisión de\nantecedentes "
+T_PROC_PREV$PROC_PREV[T_PROC_PREV$PROC_PREV=="EN REVISIÓN PCD"]="En revisión PCD"
+
+
+
+
+
+## ===================== -
+## 4) Datos generales 
+## ===================== -
+
+## ---------------- -
+## Generando tabla 
+## ---------------- -
+
+T_INFO_GENERAL_1=IMPOSICION[,c(1,8)] %>%
+  ## subset() %>%
+  ## group_by(PROC_PREV) %>%
+  dplyr::summarize("Medidas totales" = n_distinct(EXP_CMIN))%>%
+  as.data.frame()
+
+T_INFO_GENERAL_2=IMPOSICION[,c(1,7,56,53)] %>%
+  subset(ESTADO=="TERMINADO") %>%
+  ## group_by(PROC_PREV) %>%
+  dplyr::summarize("Medidas totales terminadas" = n(),"Días promedio terminadas" = mean(na.omit(T_ACT_FIRMA)),"Días promedio elaboración" = mean(na.omit(T_ELAB_IMP)))%>%
+  as.data.frame()
+
+T_INFO_GENERAL_3=IMPOSICION[,c(1,10,14)] %>%
+  subset(REQ_PROC=="SI") %>%
+  ## group_by(PROC_PREV) %>%
+  dplyr::summarize("Días promedio proceso previo" = mean(na.omit(T_PROC_PREV)))%>%
+  as.data.frame()
+
+T_INFO_GENERAL=cbind(T_INFO_GENERAL_1,T_INFO_GENERAL_2,T_INFO_GENERAL_3)
+
+
+
+#########################
+
+################## ###
+#### III.2  BD ETAPAS   ----
+################## ###
+
+
+## ========================== -
+## a) MEDIDAS CON REQ PREVIO 
+## ========================== -
+
+## ---------------- -
+## Generando tabla 
+## ---------------- -
+
+T_TIEMPOS_ETAPA=ETAPAS[,c(3,7,10:14)] %>%
+  ## subset() %>%
+  group_by(ETAPA) %>%
+  dplyr::summarize("Atención promedio" = mean(T_ELAB_ETAPAS, na.rm = T),"Atención ideal" = mean(T_IDEAL, na.rm = T),"Atención auxiliar" = mean(AUX_T_ETAPA, na.rm = T))%>%
+  as.data.frame()
+T_TIEMPOS_ETAPA$ETAPA[T_TIEMPOS_ETAPA$ETAPA=="1. ELABORACIÓN DEL PROYECTO"]="1. Elaboración del\nproyecto"
+T_TIEMPOS_ETAPA$ETAPA[T_TIEMPOS_ETAPA$ETAPA=="2. REVISIÓN DEL ANALISTA LEGAL"]="2. Revisión del\nAnalista legal"
+T_TIEMPOS_ETAPA$ETAPA[T_TIEMPOS_ETAPA$ETAPA=="3. REVISIÓN DEL JEFE DE ACTIVIDAD"]="3. Revisión del\nJefe de actividad"
+T_TIEMPOS_ETAPA$ETAPA[T_TIEMPOS_ETAPA$ETAPA=="4. REVISIÓN DEL COORDINADOR DE MEDIDAS ADM (DSEM)"]="4. Revisión del\nCoordinador de medidas"
+T_TIEMPOS_ETAPA$ETAPA[T_TIEMPOS_ETAPA$ETAPA=="4. REVISIÓN DEL COODINADOR DE MEDIDAS ADM (DSEM)"]="4. Revisión del\nCoordinador de medidas"
+T_TIEMPOS_ETAPA$ETAPA[T_TIEMPOS_ETAPA$ETAPA=="5. REVISIÓN PCD"]="5. Revisión PCD"
+T_TIEMPOS_ETAPA$ETAPA[T_TIEMPOS_ETAPA$ETAPA=="6. FIRMA DSEM"]="6. Firma DSEM"
+
+
+
+## ========================== -
+## b) MEDIDAS TIEMPOS 
+## ========================== -
+
+## ---------------- -
+## Generando tabla 
+## ---------------- -
+
+T_TIEMPOS_ETAPA2=ETAPAS[,c(3,7,10:14)] %>%
+  as.data.frame()
+T_TIEMPOS_ETAPA2$ETAPA[T_TIEMPOS_ETAPA2$ETAPA=="1. ELABORACIÓN DEL PROYECTO"]="1. Elaboración del\nproyecto"
+T_TIEMPOS_ETAPA2$ETAPA[T_TIEMPOS_ETAPA2$ETAPA=="2. REVISIÓN DEL ANALISTA LEGAL"]="2. Revisión del\nAnalista legal"
+T_TIEMPOS_ETAPA2$ETAPA[T_TIEMPOS_ETAPA2$ETAPA=="3. REVISIÓN DEL JEFE DE ACTIVIDAD"]="3. Revisión del\nJefe de actividad"
+T_TIEMPOS_ETAPA2$ETAPA[T_TIEMPOS_ETAPA2$ETAPA=="4. REVISIÓN DEL COORDINADOR DE MEDIDAS ADM (DSEM)"]="4. Revisión del\nCoordinador de medidas"
+T_TIEMPOS_ETAPA2$ETAPA[T_TIEMPOS_ETAPA2$ETAPA=="4. REVISIÓN DEL COODINADOR DE MEDIDAS ADM (DSEM)"]="4. Revisión del\nCoordinador de medidas"
+T_TIEMPOS_ETAPA2$ETAPA[T_TIEMPOS_ETAPA2$ETAPA=="5. REVISIÓN PCD"]="5. Revisión PCD"
+T_TIEMPOS_ETAPA2$ETAPA[T_TIEMPOS_ETAPA2$ETAPA=="6. FIRMA DSEM"]="6. Firma DSEM"
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 15
+## ---------------------------------- -
+
+PRE_TAB_1=IMPOSICION %>%
+  select(everything()) %>%  ## replace to your needs
+  summarise_all(funs(sum(is.na(.))))
+
+PRE_TAB_1=gather(PRE_TAB_1, Columna, Cantidad, 1:ncol(PRE_TAB_1), factor_key=TRUE)
+
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 15
+## ---------------------------------- -
+
+PRE_TAB_2=ETAPAS %>%
+  select(everything()) %>%  ## replace to your needs
+  summarise_all(funs(sum(is.na(.))))
+
+PRE_TAB_2=gather(PRE_TAB_2, Columna, Cantidad, 1:ncol(PRE_TAB_2), factor_key=TRUE)
+
+
+
+
+## 
+## T_TIEMPOS_TOT=T_TIEMPOS_ETAPA2 %>%
+##   subset(ESTADO_ETAPA=="TERMINADO") %>%
+##   dplyr::summarize("Atención auxiliar" = mean(AUX_T_EXP))%>%
+##   as.data.frame()
+
+#####################
+
+```
+
+\rightline{\footnotesize \textbf{Sin registro en el Siged}}
+\vspace{0mm}
+\centerline{\textbf{INFORME INTERNO}}
+\vspace{3mm}
+\begin{tabular}
+{ p{1.65cm}  p{0.2cm}  p{12.85cm} }
+\textbf{A} & : & \textbf{DANTE GUERRERO BARRETO}\\
+& & Subdirector de Seguimiento de Entidades de Fiscalización Ambiental \\
+& & \\
+\textbf{DE} & : & \textbf{CLAUDIA XIMENA CASTILLO TITO}\\
+& & Auxiliar Administrativo \\
+& & \\
+\textbf{ASUNTO} & : & Resumen de la información consignada en los registros relacionados a la imposición, seguimiento de medidas administrativas y multas cohercitivas de la Coordinación de Supervisión en Minería de la Dirección de Supervisión de Energía y Minas
+\\
+& & \\
+\textbf{FECHA} & : & Lima, `r day(now())` de `r Mes_actual` de `r year(now())` \\
+& & \\
+\hline
+\end{tabular}
+\vspace{1mm}
+\normalsize
+
+Me es grato dirigirme a usted para saludarlo y presentarle un informe que contiene el resumen de la información consignada en los registros relacionados a la imposición, seguimiento de medidas administrativas y multas cohercitivas de la Coordinación de Supervisión en Minería de la Dirección de Supervisión de Energía y Minas (en adelante, **Registro de Imposición**).[^PRE1]
+
+[^PRE1]: Este informe fue elaborado en **[R Studio](https://rstudio.com/)** utilizando [\Rlogo](https://www.r-project.org/) (versión `r getRversion()`) y [\LaTeX](https://www.latex-project.org/).
+
+
+# OBJETO DEL INFORME
+
+1. Este documento ha sido elaborado con la finalidad de facilitar el control y seguimiento del trabajo realizado por el equipo de la Coordinación de Supervisión en Minería de la Dirección de Supervisión de Energía y Minas (en adelante, CMIN), proporcionando un insumo que puede ser utilizado para analizar el desempeño del equipo y de sus miembros. En caso de realizar dicho análisis, es necesario tomar en cuenta otra información que complementa a la que se presenta en este informe (como, por ejemplo, la que pueda brindar la persona que lidera el equipo). 
+
+2. La confiabilidad de la información presentada en este documento depende del correcto llenado del Registro de Imposición por parte del equipo de la CMIN que se dedica a la  imposición de medidas administrativas. En este sentido, se recomienda acompañar este informe con otro que dé cuenta de los resultados de haber realizado una comprobación aleatoria de dicha información. 
+
+
+# PUNTOS A DESARROLLAR
+
+3. Para facilitar la lectura de este documento, la información consignada ha sido agrupada en torno a dos (2) elementos: 
+
+* Resumen de la información consignada en el Registro de Imposición de Medidas Administrativas (anualmente)
+
+* Información que contribuye a identificar errores de llenado en el Registro.
+
+# CAPÍTULO 1: IMPOSICIONES
+
+## RESUMEN DE LA INFORMACIÓN CONSIGNADA EN EL REGISTRO DE IMPOSICIÓN DE MEDIDAS ADMINISTRATIVAS DURANTE  LOS ÚLTIMOS DOCE (12) MESES
+
+### Estado general del registro de Imposición de Medidas Administrativas
+
+4. De acuerdo con la información del Registro de Imposición, se han registrado un total de **`r sum(T_ESTADO[,c(2)])` proyectos de medidas administrativas** proyectos de medidas administrativas. La siguiente figura muestra la distribución del estado de los proyectos de medidas administrativas.
+
+\arrayrulecolor{black}
+```{r out.width = "100%",fig.height=3,fig.align='center',fig.cap="\\label{Pie_1}Resumen de las medidas por imponer, por estado"}
+
+
+###################### ###
+####   BD IMPOSICION   ####
+###################### ###
+
+
+## ====================== -
+## 1) MEDIDAS POR ESTADO 
+## ====================== -
+
+## ------------------ -
+## Generando gráfico 
+## ------------------ -
+
+RATIO=0.6 #El % que representa espacio interno de la dona respecto al total 
+TAMAÑO=10 #Tamaño de la dona
+
+G_ESTADO=ggplot(T_ESTADO,aes(x=TAMAÑO*(1+RATIO)/2, y=Medidas, fill=reorder(ESTADO,Medidas)))+
+  geom_col(width = (1-RATIO)*TAMAÑO,color="white",lwd=2)+ #,
+  coord_polar("y", start = 0) +
+  xlim(0, TAMAÑO)+
+  geom_shadowtext(aes(x=TAMAÑO,label = paste0(round(Porcentaje*100), "%")),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  labs(x="", y="",
+       ## title = "Resumen de las medidas por imponer, por estado",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10)) +
+  scale_fill_manual(values = c(OEFA.MOSTAZA,OEFA.AZUL2,OEFA.GRIS,OEFA.AZUL2,OEFA.JADE,OEFA.TURQUEZA,OEFA.AZUL1))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_legend_at("right")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+  ## guides(fill=guide_legend(nrow=1,byrow=TRUE,keyheight = 1.5))
+
+G_ESTADO
+
+
+
+```
+
+
+### Etapas del procedimiento de imposición de medidas administrativas y plazos de atención de los requerimientos durante los últimos doce (12) meses.
+
+5. Luego de la etapa de diseño e implementación del Registro de Imposición, se relevó con CMIN que el proceso de imposición de medidas administrativas se divide en las siguientes etapas[^PRE2]
+
+[^PRE2]: La asignación del proyecto no es una etapa del proceso, pero sí un periodo de tiempo que se mide en el presente informe en la medida que en este periodo de tiempo se designa a un especialista del equipo de CMIN para elaborar el proyecto de resolución de imposición de una medida administrativa.
+
+  a. Proceso previo: etapa del proceso en la que se determina, mediante revisión de antecedentes o pruebas de laboratorio, si el caso amerita o no la imposición de una medida administrativa.
+  b. Elaboración del proyecto por parte del especialista: etapa del proceso en la que un especialista del equipo de CMIN elabora el proyecto de resolución.
+  c. Revisión del analista legal: etapa del proceso en la que el analista legal valida el proyecto de resolución.
+  d. Revisión del coordinador de actividad: etapa del proceso en la que el coordinador de actividad valida el proyecto de resolución.
+  e. Revisión del coordinador de medida administrativas  de la Dirección de Supervisión de Energía y Minas (DSEM): etapa del proceso en la que el coordinador de medidas administrativas valida el proyecto de resolución.
+  f. Revisión de la Presidencia de Consejo Directivo (PCD): etapa del proceso en que el equipo de PCD aprueba el proyecto de resolución
+  g. Firma de la DSEM: etapa del proceso en que la Dirección de Supervisión en Energía y Minas firma la resolución final que impone la medida administrativa.
+
+
+6. En base a los **`r subset(T_ESTADO,TIPO=="T_4")[,c(2)]`** casos registrados en los que se ha impuesto una medida administrativa se puede concluir que la duración promedio del proceso de imposición es de **`r ceiling(T_INFO_GENERAL[,c(3)])`** días hábiles, tomando en cuenta el plazo transcurrido desde la etapa de proceso previo hasta la firma de la resolución que impone la medida por parte de DSEM[^PRE3]. En la Figura \ref{T_limites} se muestran los plazos internos establecidos por CMIN (“plazo ideal”) para el cumplimiento de cada una de las etapas, en comparación con la duración promedio actual de cada estadío del proceso de imposición de una medida administrativa (“plazo logrado”)[^PRE4]. 
+
+
+```{r out.width = "100%",fig.height=3.5,fig.align='center',fig.cap="\\label{T_limites}Duración promedio del procedimiento de imposición de medidas administrativas"}
+
+################## ###
+####   BD ETAPAS   ####
+################## ###
+
+
+## ========================== -
+## a) MEDIDAS CON REQ PREVIO 
+## ========================== -
+
+
+## ------------------ -
+## Generando gráfico 
+## ------------------ -
+
+## RATIO=0.6 #El % que representa espacio interno de la dona respecto al total 
+## TAMAÑO=20 #Tamaño de la dona
+
+G_TIEMPOS_ETAPA=ggplot(T_TIEMPOS_ETAPA,aes(x=ETAPA))+
+  geom_bar(stat="identity",aes(y=`Atención auxiliar`,fill=OEFA.TURQUEZA))+ #
+  geom_errorbar(aes(y = `Atención ideal`, ymin = `Atención ideal`, ymax = `Atención ideal`,color=OEFA.ROJO),lty=3, size=1.1 ) +
+  coord_flip()+
+
+  geom_shadowtext(aes(x=ETAPA,y=`Atención auxiliar`, label = round(`Atención auxiliar`,digits = 1)),
+                  color="white", fontface="bold", size=5,
+                  nudge_y= 0.7, check_overlap = T)+
+  labs(x="", y="Días hábiles",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN\nNota: El plazo ideal se encuentra señalado por la linea roja")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.x =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed"))) +
+  scale_fill_manual(labels = c("Plazo logrado "),values = c(OEFA.VERDE),guide = "legend")+
+  scale_color_manual(labels = c("Plazo ideal"),values = c(OEFA.ROJO),guide = "legend")+
+  scale_y_continuous(limits = c(0, 15), breaks = seq(0,15,1), expand = c(0, 0))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+
+G_TIEMPOS_ETAPA
+
+
+
+
+#####################
+
+
+```
+
+
+[^PRE3]: Este plazo incluye las etapas previstas en el punto 5 del presente informe.
+[^PRE4]: El “plazo ideal” es el plazo fijado por el equipo de CMIN como límite máximo para el cumplimiento de cada etapa de la elaboración de las medidas administrativas. Estos plazos fueron fijados por DSEM en Noviembre de 2020, sin embargo la data muestra resultados desde el mes de Agosto de 2020 en que se implementó el Registro de Imposición.
+
+
+7. En base a las **`r T_INFO_GENERAL[,c(1)]`** medidas impuestas, previstas en el Registro de Imposición, el plazo promedio para la elaboración de una resolución que impone una medida administrativa es de **`r ceiling(T_INFO_GENERAL[,c(4)])`** días hábiles. Este plazo incluye las etapas de elaboración del especialista, revisión del analista legal, revisión de coordinador de actividad, revisión del coordinador de medidas administrativas DSEM, revisión de PCD y firma DSEM.
+
+
+8. De acuerdo a la información consignada en el Registro de Imposición, se evidencia que el plazo promedio logrado por el equipo de CMIN para culminar con la etapa de proceso previo es de **`r ceiling(T_INFO_GENERAL[,c(5)])`** días hábiles. De la revisión de los **`r sum(T_REQ_PREV[,c(2)])`** casos ingresados en el Registro de Imposición se ha detectado que **`r T_REQ_PREV[2,c(2)]`** **`r paste0("(",round(100*T_REQ_PREV[2,c(3)],digits = 1),"%)")`** medidas requirieron algún tipo de proceso previo mientras **`r T_REQ_PREV[1,c(2)]`** **`r paste0("(",round(100*T_REQ_PREV[1,c(3)],digits = 1),"%)")`** medidas no requirieron pasar por este proceso. Asimismo, respecto a los tipos de proceso previo, **`r (T_PROC_PREV[2,c(2)])`**  **`r paste0("(",round(100*T_PROC_PREV[2,c(3)],digits = 1),"%)")`** consistieron en revisión de antecedentes, mientras que **`r (T_PROC_PREV[1,c(2)])`** **`r paste0("(",round(100*T_PROC_PREV[1,c(3)],digits = 1),"%)")`** en resultados de laboratorio.
+
+
+```{r out.width = "100%",fig.height=3,fig.align='center',fig.cap="\\label{Pie_2}Medios que requieren proceso previo"}
+## ========================== -
+## 2) MEDIDAS CON REQ PREVIO 
+## ========================== -
+
+## ------------------ -
+## Generando gráfico 
+## ------------------ -
+
+RATIO=0.6 #El % que representa espacio interno de la dona respecto al total 
+TAMAÑO=20 #Tamaño de la dona
+
+G_EQ_PREV=ggplot(T_REQ_PREV,aes(x=TAMAÑO*(1+RATIO)/2, y=Medidas, fill=reorder(REQ_PROC,Medidas)))+
+  geom_col(width = (1-RATIO)*TAMAÑO,color="white",lwd=2)+ #
+  coord_polar("y", start = 0) +
+  xlim(0, TAMAÑO)+
+  geom_shadowtext(aes(x=TAMAÑO,label = Medidas),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  labs(x="", y="",
+       ## title = "Medios que requieren proceso previo",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10)) +
+  scale_fill_manual(values = c(OEFA.VERDE,OEFA.AZUL1))+
+  ggeasy::easy_add_legend_title("")+
+  #ggeasy::easy_legend_at("bottom")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+  ## guides(fill=guide_legend(nrow=1,byrow=TRUE,keyheight = 2))
+
+G_EQ_PREV
+
+```
+
+```{r out.width = "100%",fig.height=2,fig.align='center',fig.cap="\\label{Barras_1}Tipos de procesos previos"}
+
+## ===================== -
+## 3) TIPOS DE PROCESOS 
+## ===================== -
+
+## ------------------ -
+## Generando gráfico 
+## ------------------ -
+
+RATIO=0.6 #El % que representa espacio interno de la dona respecto al total 
+TAMAÑO=10 #Tamaño de la dona
+
+G_PROC_PREV=ggplot(T_PROC_PREV,aes(x=reorder(PROC_PREV,Medidas),y=Medidas))+ #, fill=reorder(PROC_PREV,Medidas)
+  geom_col(fill=OEFA.VERDE)+
+  coord_flip()+
+  geom_shadowtext(aes(label = Medidas),
+                  color="white", fontface="bold", size=5,
+                  nudge_y= 0.5, check_overlap = T)+
+  labs(x="", y="",
+       ## title = "Tipos de procesos previos",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed"))) +
+  ## scale_fill_manual(values = c(OEFA.VERDE,OEFA.VERDE,OEFA.VERDE))+
+  ggeasy::easy_add_legend_title("")+ 
+  ggeasy::easy_legend_at("bottom")#+
+  #ggeasy::easy_plot_legend_size(size=10)#+
+  ## guides(fill=guide_legend(nrow=1,byrow=TRUE,keyheight = 2))
+
+G_PROC_PREV
+
+```
+
+
+
+### Proceso previo
+
+
+9. Esta sección se enfoca en el análisis de los casos que han sido registrados en el Registro de Imposición que fueron atendidos por los miembros del equipo de CMIN. Cada una de las etapas de la elaboración de las medidas administrativas cuenta con indicadores que responden a unas características particulares. A continuación se mostrará el desempeño de los miembros del equipo de CMIN respecto a los casos gestionados y los plazos fijados para la atención en cada etapa.
+
+
+10. La siguiente figura muestra la cantidad de requerimientos y plazos de atención en la etapa de elaboración del proyecto. 
+
+
+```{r out.width = "100%",fig.height=3.5,fig.align='center',fig.cap="\\label{DENS_1}Tiempos promedio de atención (Elaboración de proyecto)"}
+
+################## ###
+####   BD ETAPAS   ####
+################## ###
+
+
+## ========================== -
+## b) MEDIDAS TIEMPOS 
+## ========================== -
+
+
+## ------------------ -
+## Generando gráfico 
+## ------------------ -
+
+
+G_TIEMPOS_ETAPA2=subset(T_TIEMPOS_ETAPA2,ETAPA=="1. Elaboración del\nproyecto")%>%
+  mutate("%Cumplimiento"=ecdf(T_ELAB_ETAPAS)(T_IDEAL))%>%
+ggplot(aes(x=T_ELAB_ETAPAS))+
+  ## geom_histogram(aes(y=..ndensity..))+
+  geom_histogram(color="white", fill=OEFA.AZUL1,binwidth=1)+
+  geom_vline(aes(xintercept=T_IDEAL),color=OEFA.ROJO, size=2,linetype=3)+
+
+  ## geom_shadowtext(aes(x=ETAPA,y=`Atención auxiliar`, label = round(`Atención auxiliar`,digits = 1)),
+  ##                 color="white", fontface="bold", size=5,
+  ##                 position = position_stack(vjust = 1.2), check_overlap = T)+
+  labs(x="Días hábiles", y="Frecuencia",
+       ## title = "Tiempos promedio de atención",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN\nNota: El plazo ideal se encuentra señalado por la linea roja")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.x =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed"))) +
+  scale_x_continuous(limits = c(0, 16), breaks = seq(0,16,2), expand = c(0, 0))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+
+G_TIEMPOS_ETAPA2
+
+## ecdf(T_TIEMPOS_ETAPA2$AUX_T_EXP)(5)
+
+
+```
+
+
+
+11. La siguiente muestra la cantidad de requerimientos y plazos de atención en la etapa de revisión del especialista legal.
+
+```{r out.width = "100%", fig.height=3.5, fig.align='center',fig.cap="\\label{DENS_2}Tiempos promedio de atención (Revisión de analista)"}
+
+################## ###
+####   BD ETAPAS   ####
+################## ###
+
+
+## ========================== -
+## b) MEDIDAS TIEMPOS 
+## ========================== -
+
+
+## ------------------ -
+## Generando gráfico 
+## ------------------ -
+
+
+G_TIEMPOS_ETAPA2=subset(T_TIEMPOS_ETAPA2,ETAPA=="2. Revisión del\nAnalista legal")%>%
+  mutate("%Cumplimiento"=ecdf(T_ELAB_ETAPAS)(T_IDEAL))%>%
+ggplot(aes(x=T_ELAB_ETAPAS))+
+  ## geom_histogram(aes(y=..ndensity..))+
+  geom_histogram(color="white", fill=OEFA.TURQUEZA,binwidth=1)+
+  geom_vline(aes(xintercept=T_IDEAL),color=OEFA.ROJO, size=2,linetype=3)+
+
+  ## geom_shadowtext(aes(x=ETAPA,y=`Atención auxiliar`, label = round(`Atención auxiliar`,digits = 1)),
+  ##                 color="white", fontface="bold", size=5,
+  ##                 position = position_stack(vjust = 1.2), check_overlap = T)+
+  labs(x="Días hábiles", y="Frecuencia",
+       ## title = "Tiempos promedio de atención",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN\nNota: El plazo ideal se encuentra señalado por la linea roja")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.x =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed"))) +
+  scale_x_continuous(limits = c(0, 16), breaks = seq(0,16,2), expand = c(0, 0))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+
+G_TIEMPOS_ETAPA2
+
+## ecdf(T_TIEMPOS_ETAPA2$AUX_T_EXP)(5)
+
+```
+
+
+12. La siguiente figura muestra la cantidad de requerimientos y plazos de atención en la etapa de revisión del coordinador de actividad. 
+
+```{r out.width = "100%", fig.height=3.5, fig.align='center',fig.cap="\\label{DENS_3}Tiempos promedio de atención (Revisión de jefe de actividad)"}
+################## ###
+####   BD ETAPAS   ####
+################## ###
+
+
+## ========================== -
+## b) MEDIDAS TIEMPOS 
+## ========================== -
+
+
+## ------------------ -
+## Generando gráfico 
+## ------------------ -
+
+
+G_TIEMPOS_ETAPA2=subset(T_TIEMPOS_ETAPA2,ETAPA=="3. Revisión del\nJefe de actividad")%>%
+  mutate("%Cumplimiento"=ecdf(T_ELAB_ETAPAS)(T_IDEAL))%>%
+ggplot(aes(x=T_ELAB_ETAPAS))+
+  ## geom_histogram(aes(y=..ndensity..))+
+  geom_histogram(color="white", fill=OEFA.AZUL2,binwidth=1)+
+  geom_vline(aes(xintercept=T_IDEAL),color=OEFA.ROJO, size=2,linetype=3)+
+
+  ## geom_shadowtext(aes(x=ETAPA,y=`Atención auxiliar`, label = round(`Atención auxiliar`,digits = 1)),
+  ##                 color="white", fontface="bold", size=5,
+  ##                 position = position_stack(vjust = 1.2), check_overlap = T)+
+  labs(x="Días hábiles", y="Frecuencia",
+       ## title = "Tiempos promedio de atención",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN\nNota: El plazo ideal se encuentra señalado por la linea roja")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.x =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed"))) +
+  scale_x_continuous(limits = c(0, 16), breaks = seq(0,16,2), expand = c(0, 0))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+
+G_TIEMPOS_ETAPA2
+
+## ecdf(T_TIEMPOS_ETAPA2$AUX_T_EXP)(5)
+
+```
+
+
+### Etapas finales de validación y aprobación de las resoluciones que imponen medidas administrativas
+
+13. Esta sección se enfoca en el análisis de los casos que han sido registrados en el Registro de Imposición que fueron atendidos en el procedimiento de imposición de medidas administrativas en las etapas de revisión del coordinador de medidas administrativas (DSEM), aprobación PCD y firma DSEM. A continuación se mostrará el desempeño de los involucrados respecto a los casos gestionados y los plazos para la atención en cada etapa. 
+
+14. La siguiente figura muestra los tiempos logrados en las etapas finales de validación y aprobación de las resoluciones que imponen medidas administrativas: la revisión del coordinador de medidas administrativas (DSEM) culminó en un plazo promedio de 2 días hábiles, la revisión en PCD en 3 días hábiles y la firma de DSEM en 1 día hábil.
+
+```{r out.width = "100%", fig.height=2.5, fig.align='center',fig.cap="\\label{TAB_1}Indicadores principales"}
+## ===================== -
+## 4) Datos generales 
+## ===================== -
+
+## ---------------- -
+## Generando Gráfico 
+## ---------------- -
+
+G_INFO_GENERAL= T_INFO_GENERAL %>% gather(Tipo, Valor,`Medidas totales`:`Días promedio proceso previo`)%>%
+
+ggplot(aes(x=Tipo, y=Valor))+
+  geom_segment( aes(x=Tipo, xend=Tipo, y=0, yend=Valor)) +
+  geom_point( size=5, color="black", fill=alpha(OEFA.JADE, 0.3), alpha=0.7, shape=21, stroke=2)+
+  geom_shadowtext(aes(label = round(Valor)),
+                  color="white", fontface="bold", size=5,  
+                  nudge_y= 8, check_overlap = T)+
+  labs(x="", y=""
+      ## title = "Tiempos promedio de atención",
+      ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+      ## caption = "Fuente: CMIN\nNota: El plazo ideal se encuentra señalado por la linea roja"
+      )+
+  theme(panel.background = element_blank(),
+        panel.grid.major.x =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.text.x = element_blank(),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  coord_flip()
+
+G_INFO_GENERAL
+
+```
+
+## INFORMACIÓN QUE CONTRIBUYE A IDENTIFICAR ERRORES DE LLENADO EN EL REGISTRO
+
+### Composición del Registro
+
+15. El Registro cuenta con dos pestañas: la primera denominada “Imposición de Medidas Administrativas”, en la cual se recoge información general del proyecto de resolución que impone la medida y, la segunda denominada “Etapas”, en la que se consigna la información referente a los pasos necesarios para la elaboración de proyecto de resolución de medida administrativa.
+
+16. Respecto a la cantidad de columnas, la primera pestaña cuenta con **`r COL_IMP`** columnas. En cuanto a la cantidad de columnas de la segunda pestaña, esta cuenta con **`r COL_ETAP`** columnas llenadas en su totalidad. En el Cuadro 1 de los anexos se proporciona una lista con los nombres de todas las columnas según la pestaña en la que se encuentran.
+
+
+### Conteo de espacios vacíos y/o celdas “NA”
+
+17. Para facilitar la identificación de posibles errores de llenado del Registro de Imposición de medidas administrativas se ejecutó la siguiente acción: conteo de espacios vacíos y/o celdas “NA”.
+
+18. Existen 159 espacios vacíos y/o celdas “NA” en todas las pestañas del Registro de Imposición lo que representa el 4.9% de un total de  3143 celdas. La distribución de espacios vacíos y/o celdas “NA” en el registro se observa en las siguientes figuras. 
+
+**(Respecto a los espacios vacíos y/o celdas "NA" en todas las pestañas de los registros, la distribución de las mismas se puede apreciar en las siguientes figuras)**
+
+```{r out.width = "100%",fig.height=10,fig.align='center',fig.cap="\\label{FIG_17}Distribución de espacios vacíos y/o celdas NA en la pestaña: Lista de medidas administrativas"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 13
+## ---------------------------------- -
+
+GRAF_14=ggplot(PRE_TAB_1,aes(x=Columna,y=Cantidad, fill=OEFA.AZUL1))+
+  geom_col()+
+  coord_flip()+
+
+  geom_shadowtext(aes(x=Columna,y=Cantidad, label = Cantidad),hjust=0, nudge_y= 0.1,
+                  vjust=0.5,color="white", fontface="bold", size=5, check_overlap = T)+
+
+
+  labs(x="Nombre de columnas", y="Cantidad de vacios",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.TURQUEZA))+
+  ggeasy::easy_rotate_x_labels(angle = 45,side = "right")+
+  ggeasy::easy_add_legend_title("Estado")
+
+GRAF_14
+
+```
+
+```{r out.width = "100%",fig.align='center',fig.cap="\\label{FIG_17}Distribución de espacios vacíos y/o celdas NA en la pestaña: Lista de medidas administrativas"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 13
+## ---------------------------------- -
+
+GRAF_15=ggplot(PRE_TAB_2,aes(x=Columna,y=Cantidad, fill=OEFA.AZUL1))+
+  geom_col()+
+  coord_flip()+
+
+  geom_shadowtext(aes(x=Columna,y=Cantidad, label = Cantidad),hjust=0, nudge_y= 0.1,
+                  vjust=0.5,color="white", fontface="bold", size=5, check_overlap = T)+
+
+
+  labs(x="Nombre de columnas", y="Cantidad de vacios",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.AZUL2))+
+  ggeasy::easy_rotate_x_labels(angle = 45,side = "right")+
+  ggeasy::easy_add_legend_title("Estado")
+
+GRAF_15
+
+```
+
+19. Por si sola, esta información no permite identificar errores en el llenado del registro. Sin embargo, debería servir de insumo para verificar los espacios vacíos y/o celdas “NA” de las columnas respecto de las que se sospeche que esta situación puede ser incorrecta.
+
+
+
+\newpage
+
+```{r setup_2, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+
+################################ ###
+####   Descargar y trabajar BD   ####
+################################ ###
+
+
+## ===================== -
+## Seteos para descarga 
+## ===================== -
+
+FUENTE_SEGUIMIENTO<- "https://docs.google.com/spreadsheets/d/e/2PACX-1vRXq3Iye9AiWo3lxRnkFfK_LXuCtb9k-q815z1czEVsOj4VZG7OrSBhhWJm1eTqdWBtUBeFKpRqrC4B/pub?output=xlsx"
+
+#SETEANDO NOMBRE ARCHIVO PARA BACKUP
+## archivo1='IMPOSICION.csv'
+## archivo2='SEGUIMIENTOcsv'
+## archivo3='MULTAS.csv'
+
+
+
+
+#_____________________________________________________________________________________________________
+
+## ================ =
+## BD IMPOSICIONES
+## ================ =
+
+
+## ------------------------------------------- -
+## Descarga Libro y definiendo el diccionario 
+## ------------------------------------------- -
+
+#GENERANDO UN TEMPORAL
+tp1<-tempfile()
+
+#Descargar el libro completo
+download.file(FUENTE_SEGUIMIENTO,tp1,mode ="wb")
+
+#Definir el dicionario general
+DIC<-read_xlsx(path = tp1, sheet = "DIC VARIABLES")
+DIC_TABLA_2=DIC
+
+#CANTIDAD DE MEDIDAS
+COL_MEDIDAS=nrow(subset(DIC,DATASET=="1) LISTA MA"))
+COL_OBLIG=nrow(subset(DIC,DATASET=="3) OBLIGACIONES"))
+COL_ACRED=nrow(subset(DIC,DATASET=="4) ACREDITACION"))
+COL_VARIAC=nrow(subset(DIC,DATASET=="5) VARIACIONES_RECURSOS"))
+
+
+#_____________________________________________________________________________________________________
+
+
+## --------------------------------- -
+## Descarga Pestaña IMPOSICIONES MA 
+## --------------------------------- -
+
+#Subseteando diccionario
+DIC_MEDIDAS= DIC[DIC$DATASET=="1) LISTA MA"&DIC$`NO RELEVANTE EN SCRIPT`=="FALSE", ] #Selecciono solo el dataset a usar y se eliminan campos irrelevantes
+DIC_MEDIDAS=DIC_MEDIDAS[,c(2:3)] #solo me quedo con los campos en BD y CODIFICACION
+CABECERAS=as.list(DIC_MEDIDAS) #Se crea la lista de las cabeceras a emplearse
+
+# Cargando BD 
+BD_MEDIDAS <- as.data.frame(read_xlsx(tp1,skip = 0, sheet = "1) LISTA MA"))
+colnames(BD_MEDIDAS)=CABECERAS$`CODIGO CAMPO` #Renombro las cabeceras seg?n CODIGO CSEP
+
+BD_MEDIDAS <- subset(BD_MEDIDAS,
+                  as.Date(BD_MEDIDAS$F_NOTIF_RESOL) >= Inicio & 
+                    as.Date(BD_MEDIDAS$F_NOTIF_RESOL)<= Fin,
+                  select = CABECERAS$`CODIGO CAMPO`) 
+
+BD_MEDIDAS <- BD_MEDIDAS[is.na(BD_MEDIDAS$EXP)!=T, ]
+
+
+#_____________________________________________________________________________________________________
+
+
+## ----------------------------- -
+## Descarga Pestaña OBLIGACIONES 
+## ----------------------------- -
+
+#Subseteando diccionario
+DIC_OBLIG= DIC[DIC$DATASET=="3) OBLIGACIONES"&DIC$`NO RELEVANTE EN SCRIPT`=="FALSE", ] #Selecciono solo el dataset a usar y se eliminan campos irrelevantes
+DIC_OBLIG=DIC_OBLIG[,c(2:3)] #solo me quedo con los campos en BD y CODIFICACION
+CABECERAS=as.list(DIC_OBLIG) #Se crea la lista de las cabeceras a emplearse
+
+# Cargando BD 
+BD_OBLIG<-as.data.frame(read_xlsx(tp1,skip = 2, sheet = "3) OBLIGACIONES"))
+colnames(BD_OBLIG)=CABECERAS$`CODIGO CAMPO` #Renombro las cabeceras seg?n CODIGO CSEP
+
+BD_OBLIG=subset(BD_OBLIG,
+                  as.Date(BD_OBLIG$F_NOTIF_RESOL)>=Inicio & 
+                  as.Date(BD_OBLIG$F_NOTIF_RESOL)<=Fin,
+                  select = CABECERAS$`CODIGO CAMPO`) #Limito los campos con los que se trabajar
+
+BD_OBLIG=BD_OBLIG[is.na(BD_OBLIG$COD_MED_ADM)!=T, ]
+
+
+#_____________________________________________________________________________________________________
+
+
+## ------------------------------- -
+## Descarga Pestaña ACREDITACIONES 
+## ------------------------------- -
+
+#Subseteando diccionario
+DIC_ACRED= DIC[DIC$DATASET=="4) ACREDITACION"&DIC$`NO RELEVANTE EN SCRIPT`=="FALSE", ] #Selecciono solo el dataset a usar y se eliminan campos irrelevantes
+DIC_ACRED=DIC_ACRED[,c(2:3)] #solo me quedo con los campos en BD y CODIFICACION
+CABECERAS=as.list(DIC_ACRED) #Se crea la lista de las cabeceras a emplearse
+
+# Cargando BD 
+BD_ACRED<-as.data.frame(read_xlsx(tp1,skip = 0, sheet = "4) ACREDITACION"))
+colnames(BD_ACRED)=CABECERAS$`CODIGO CAMPO` #Renombro las cabeceras seg?n CODIGO CSEP
+
+BD_ACRED <- subset(BD_ACRED,
+                as.Date(BD_ACRED$F_NOTIF_RESOL)>=Inicio & 
+                  as.Date(BD_ACRED$F_NOTIF_RESOL)<=Fin,
+                select = CABECERAS$`CODIGO CAMPO`) #Limito los campos con los que se trabajar?
+
+
+BD_ACRED=BD_ACRED[is.na(BD_ACRED$COD_MED_ADM)!=T, ]
+
+
+
+#_____________________________________________________________________________________________________
+
+
+## ------------------------------- -
+## Descarga Pestaña XXXXX
+## ------------------------------- -
+
+#Subseteando diccionario
+DIC_VAR_REC= DIC[DIC$DATASET=="5) VARIACIONES_RECURSOS"&DIC$`NO RELEVANTE EN SCRIPT`=="FALSE", ] #Selecciono solo el dataset a usar y se eliminan campos irrelevantes
+DIC_VAR_REC=DIC_VAR_REC[,c(2:3)] #solo me quedo con los campos en BD y CODIFICACION
+CABECERAS=as.list(DIC_VAR_REC) #Se crea la lista de las cabeceras a emplearse
+
+# Cargando BD
+BD_VAR_REC<-as.data.frame(read_xlsx(tp1,skip = 0, sheet = "5) VARIACIONES_RECURSOS"))
+colnames(BD_VAR_REC)=CABECERAS$`CODIGO CAMPO` #Renombro las cabeceras seg?n CODIGO CSEP
+
+BD_VAR_REC=subset(BD_VAR_REC,
+                as.Date(BD_VAR_REC$F_NOTIF_RESOL)>=Inicio & 
+                  as.Date(BD_VAR_REC$F_NOTIF_RESOL)<=Fin,
+                select = CABECERAS$`CODIGO CAMPO`) #Limito los campos con los que se trabajar
+
+
+BD_VAR_REC=BD_VAR_REC[is.na(BD_VAR_REC$RESP_SOLIC)!=T, ]
+
+ 
+###################################
+
+
+################### ###
+####   BD MEDIDAS   ####
+################### ###
+
+
+## ====================== -
+## 1) MEDIDAS POR ESTADO 
+## ====================== -
+
+## ----------------------- -
+## Generando tabla general 
+## ----------------------- -
+
+PRE_TAB_II_1=BD_MEDIDAS %>%
+  ## subset() %>%
+  ## group_by(ESTADO) %>%
+  dplyr::summarize("Resoluciones emitidas" = n_distinct(COD_RESOL))%>%
+  as.data.frame()
+
+PRE_TAB_II_2=BD_MEDIDAS %>%
+  ## subset() %>%
+  ## group_by(ESTADO) %>%
+  dplyr::summarize("Medidas administrativas" = n_distinct(COD_MED_ADM))%>%
+  as.data.frame()
+
+PRE_TAB_II_3=BD_OBLIG %>%
+  ## subset() %>%
+  ## group_by(ESTADO) %>%
+  dplyr::summarize("Obligaciones de fondo" = n())%>%
+  as.data.frame()
+
+PRE_TAB_II_4=BD_ACRED %>%
+  ## subset() %>%
+  ## group_by(ESTADO) %>%
+  dplyr::summarize("Obligaciones de acreditación" = n())%>%
+  as.data.frame()
+
+#Tabla compilada 1
+TAB_1=cbind(PRE_TAB_II_1,PRE_TAB_II_2,PRE_TAB_II_3,PRE_TAB_II_4)
+
+
+TAB_1=gather(TAB_1, TYPE, VALOR,1:ncol(TAB_1) , factor_key=TRUE)
+
+
+
+## ---------------------------- -
+## Generando tabla Evol Mensual 
+## ---------------------------- -
+
+PRE_TAB_II_5=BD_MEDIDAS %>%
+  ## subset() %>%
+  mutate(MES=month(F_NOTIF_RESOL)) %>%
+  mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(AÑO,MES) %>%
+  dplyr::summarize("Resoluciones emitidas" = n_distinct(COD_MED_ADM)) %>%
+  mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+
+
+## ---------------------------- -
+## Generando tabla Evol Mensual 
+## ---------------------------- -
+
+PRE_TAB_II_X=BD_OBLIG %>%
+  ## subset() %>%
+  ## mutate(MES=month(F_NOTIF_RESOL)) %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(COND_PREV_SN) %>%
+  dplyr::summarize("Medidas" = n()) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+PRE_TAB_II_X$Porcentaje=PRE_TAB_II_X$Medidas/sum(PRE_TAB_II_X$Medidas)
+
+
+
+## -------------------------------- -
+## Generando tabla Medidas por tipo 
+## -------------------------------- -
+
+PRE_TAB_II_6=BD_MEDIDAS %>%
+  ## subset() %>%
+  ## mutate(MES=month(F_NOTIF_RESOL)) %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(MOD_DICT) %>%
+  dplyr::summarize("Medidas" = n()) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+PRE_TAB_II_6$Porcentaje=PRE_TAB_II_6$Medidas/sum(PRE_TAB_II_6$Medidas)
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 2
+## ---------------------------------- -
+
+PRE_TAB_II_7=BD_MEDIDAS %>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(T_MEDIDA) %>%
+  dplyr::summarize("Medidas" = n()) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 3
+## ---------------------------------- -
+
+PRE_TAB_II_8=BD_OBLIG %>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(CLASE_OB) %>%
+  dplyr::summarize("Medidas" = n()) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+PRE_TAB_II_8 <-PRE_TAB_II_8[order(-PRE_TAB_II_8$Medidas),]
+rownames(PRE_TAB_II_8)=1:nrow(PRE_TAB_II_8)
+names(PRE_TAB_II_8)[names(PRE_TAB_II_8) == "CLASE_OB"] <- "Clase de medida"
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 4
+## ---------------------------------- -
+
+PRE_TAB_II_9=BD_OBLIG %>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(VERB) %>%
+  dplyr::summarize("Medidas" = n()) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+PRE_TAB_II_9 <-PRE_TAB_II_9[order(-PRE_TAB_II_9$Medidas),]
+rownames(PRE_TAB_II_9)=1:nrow(PRE_TAB_II_9)
+PRE_TAB_II_9.1=subset(PRE_TAB_II_9[c(1:9),])
+PRE_TAB_II_9.2=subset(PRE_TAB_II_9[c(10:nrow(PRE_TAB_II_9)),])
+PRE_TAB_II_9.2=PRE_TAB_II_9.2 %>%
+  dplyr::summarize("VERB"="OTROS","Medidas" = sum(Medidas)) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+PRE_TAB_II_9=rbind(PRE_TAB_II_9.1,PRE_TAB_II_9.2)
+
+PRE_TAB_II_9$Porcentaje=PRE_TAB_II_9$Medidas/sum(PRE_TAB_II_9$Medidas)
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 5
+## ---------------------------------- -
+
+PRE_TAB_II_11=BD_OBLIG %>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(ESTADO_OB) %>%
+  dplyr::summarize("Medidas" = n()) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+PRE_TAB_II_11$Porcentaje=PRE_TAB_II_11$Medidas/sum(PRE_TAB_II_11$Medidas)
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 6
+## ---------------------------------- -
+
+PRE_TAB_II_12=BD_ACRED %>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(ESTADO_SEG) %>%
+  dplyr::summarize("Medidas" = n()) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+PRE_TAB_II_12$Porcentaje=PRE_TAB_II_12$Medidas/sum(PRE_TAB_II_12$Medidas)
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 7
+## ---------------------------------- -
+
+PRE_TAB_II_13=BD_VAR_REC %>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(SOLICITUD,ESTADO) %>%
+  dplyr::summarize("Medidas" = n()) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+PRE_TAB_II_13=PRE_TAB_II_13[is.na(PRE_TAB_II_13$SOLICITUD)!=T, ]
+PRE_TAB_II_13=PRE_TAB_II_13[is.na(PRE_TAB_II_13$ESTADO)!=T, ]
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 8
+## ---------------------------------- -
+
+PRE_TAB_II_14=BD_OBLIG %>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(RESP) %>%
+  dplyr::summarize("Medidas" = n_distinct(COD_MED_ADM)) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 9
+## ---------------------------------- -
+
+PRE_TAB_II_15=BD_OBLIG %>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(RESP,ESTADO_OB) %>%
+  dplyr::summarize("Medidas" = n_distinct(COD_MED_ADM)) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+## PRE_TAB_II_15$ESTADO_OB=factor(PRE_TAB_II_15$ESTADO_OB)
+PRE_TAB_II_15= PRE_TAB_II_15[order(PRE_TAB_II_15[,3], PRE_TAB_II_15[,2]), ]
+rownames(PRE_TAB_II_15)=1:nrow(PRE_TAB_II_15)
+names(PRE_TAB_II_15)[names(PRE_TAB_II_15) == "ESTADO_OB"] <- "Estado"
+names(PRE_TAB_II_15)[names(PRE_TAB_II_15) == "RESP"] <- "Responsable"
+
+PRE_TAB_II_15=group_by(PRE_TAB_II_15, Responsable) %>% mutate("Porcentaje" = Medidas/sum(Medidas))
+
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 10
+## ---------------------------------- -
+
+PRE_TAB_II_16=BD_ACRED %>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(RESP) %>%
+  dplyr::summarize("Medidas" = n()) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 11
+## ---------------------------------- -
+
+PRE_TAB_II_17=BD_ACRED %>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(RESP,ESTADO_SEG) %>%
+  dplyr::summarize("Medidas" = n()) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 12
+## ---------------------------------- -
+
+PRE_TAB_II_18=BD_VAR_REC 
+PRE_TAB_II_18=PRE_TAB_II_18[is.na(PRE_TAB_II_18$F_SOLIC)!=T, ]
+PRE_TAB_II_18=PRE_TAB_II_18[PRE_TAB_II_18$PLAZO_LOG>0, ]
+PRE_TAB_II_18=PRE_TAB_II_18[!duplicated(PRE_TAB_II_18$HT), ]
+PRE_TAB_II_18=PRE_TAB_II_18[is.na(PRE_TAB_II_18$SOLICITUD)!=T, ]
+
+PRE_TAB_II_18=PRE_TAB_II_18%>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(SOLICITUD) %>%
+  dplyr::summarize("Plazo ideal" = mean(na.omit(PLAZO_IDEAL)),
+                   "Plazo logrado" = mean(na.omit(PLAZO_LOG))) %>%
+  ## dplyr::summarize("Plazo ideal" = mean(PLAZO_IDEAL,na.rm=TRUE),"Plazo logrado" = mean(PLAZO_LOG,na.rm=TRUE)) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+PRE_TAB_II_18=gather(PRE_TAB_II_18, TYPE, VALOR,`Plazo ideal`:`Plazo logrado` , factor_key=TRUE)
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 13
+## ---------------------------------- -
+
+PRE_TAB_II_19=BD_MEDIDAS %>%
+  select(everything()) %>%  ## replace to your needs
+  summarise_all(funs(sum(is.na(.))))
+
+PRE_TAB_II_19=gather(PRE_TAB_II_19, Columna, Cantidad, 1:ncol(PRE_TAB_II_19), factor_key=TRUE)
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 14
+## ---------------------------------- -
+
+PRE_TAB_II_20=BD_OBLIG %>%
+  select(everything()) %>%  ## replace to your needs
+  summarise_all(funs(sum(is.na(.))))
+
+PRE_TAB_II_20=gather(PRE_TAB_II_20, Columna, Cantidad, 1:ncol(PRE_TAB_II_20), factor_key=TRUE)
+
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 15
+## ---------------------------------- -
+
+PRE_TAB_II_21=BD_ACRED %>%
+  select(everything()) %>%  ## replace to your needs
+  summarise_all(funs(sum(is.na(.))))
+
+PRE_TAB_II_21=gather(PRE_TAB_II_21, Columna, Cantidad, 1:ncol(PRE_TAB_II_21), factor_key=TRUE)
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 16
+## ---------------------------------- -
+
+PRE_TAB_II_22=BD_VAR_REC %>%
+  select(everything()) %>%  ## replace to your needs
+  summarise_all(funs(sum(is.na(.))))
+
+PRE_TAB_II_22=gather(PRE_TAB_II_22, Columna, Cantidad, 1:ncol(PRE_TAB_II_22), factor_key=TRUE)
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 16
+## ---------------------------------- -
+
+PRE_TAB_II_23=BD_VAR_REC 
+PRE_TAB_II_23=PRE_TAB_II_23[is.na(PRE_TAB_II_23$F_SOLIC)!=T, ]
+PRE_TAB_II_23=PRE_TAB_II_23[PRE_TAB_II_23$PLAZO_LOG>0, ]
+PRE_TAB_II_23=PRE_TAB_II_23[!duplicated(PRE_TAB_II_23$HT), ]
+PRE_TAB_II_23=PRE_TAB_II_23[is.na(PRE_TAB_II_23$SOLICITUD)!=T, ]
+
+PRE_TAB_II_23=PRE_TAB_II_23%>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(RESP) %>%
+  dplyr::summarize("Plazo logrado" = mean(na.omit(PLAZO_LOG))) %>%
+  ## dplyr::summarize("Plazo ideal" = mean(PLAZO_IDEAL,na.rm=TRUE),"Plazo logrado" = mean(PLAZO_LOG,na.rm=TRUE)) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+## PRE_TAB_II_23=gather(PRE_TAB_II_23, TYPE, VALOR,`Plazo ideal`:`Plazo logrado` , factor_key=TRUE)
+
+
+
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 16
+## ---------------------------------- -
+
+PRE_TAB_II_24=BD_VAR_REC 
+PRE_TAB_II_24=PRE_TAB_II_24[is.na(PRE_TAB_II_24$F_SOLIC)!=T, ]
+PRE_TAB_II_24=PRE_TAB_II_24[PRE_TAB_II_24$PLAZO_LOG>0, ]
+PRE_TAB_II_24=PRE_TAB_II_24[!duplicated(PRE_TAB_II_24$HT), ]
+PRE_TAB_II_24=PRE_TAB_II_24[is.na(PRE_TAB_II_24$SOLICITUD)!=T, ]
+
+PRE_TAB_II_24=PRE_TAB_II_24%>%
+  ## subset() %>%
+  ## mutate(AÑO=year(F_NOTIF_RESOL)) %>%
+  group_by(RESP,SOLICITUD) %>%
+  dplyr::summarize("Plazo logrado" = mean(na.omit(PLAZO_LOG))) %>%
+  ## dplyr::summarize("Plazo ideal" = mean(PLAZO_IDEAL,na.rm=TRUE),"Plazo logrado" = mean(PLAZO_LOG,na.rm=TRUE)) %>%
+  ## dplyr::summarize("Porcentaje" = n()/sum(Medidas)) %>%
+  ## mutate(FECHA=as.Date(paste0(AÑO,"-",MES,"-01"),format='%Y-%m-%d')) %>%
+  as.data.frame()
+
+## PRE_TAB_II_23=gather(PRE_TAB_II_23, TYPE, VALOR,`Plazo ideal`:`Plazo logrado` , factor_key=TRUE)
+
+
+## PRE_TAB_II_24=BD_MEDIDAS %>%
+##   select(everything()) %>%  ## replace to your needs
+##   summarise_all(funs(sum(is.na(.))))
+## 
+## PRE_TAB_II_22=gather(PRE_TAB_II_22, Columna, Cantidad, 1:ncol(PRE_TAB_II_22), factor_key=TRUE)
+
+
+```
+
+
+# CAPÍTULO 2: SEGUIMIENTO
+
+## RESUMEN DE LA INFORMACIÓN CONSIGNADA EN EL REGISTRO DE SEGUIMIENTO DE MEDIDAS ADMINISTRATIVAS DURANTE LOS ÚLTIMOS DOCE MESES
+
+### Información general y evolución del ingreso de medidas administrativas
+
+1. De acuerdo con la información consignada en el Registro de Seguimiento de medidas administrativas[^PRE5], durante los últimos doce meses se han emitido **`r subset(TAB_1)[1,2]`** resoluciones.La siguiente figura muestra la información general acerca de la cantidad de medidas consignadas en el Registro de Seguimiento, mientras que la subsiguiente figura muestra la evolución mensual de medidas impuestas durante los últimos doce (12) meses.
+
+\arrayrulecolor{black}
+```{r out.width = "100%",fig.height=2,fig.align='center',fig.cap="\\label{FIG_1}Información general acerca de la cantidad de medidas consignadas en el Registro de Seguimiento"}
+
+#```{r fig.align='center', fig.width=6, fig.height=6.5, fig.cap="\\label{Espaciosvacíos}Distribución de espacios vacíos y/o celdas NA en el Registro"}
+
+
+G_0= ggplot(TAB_1,aes(x=TYPE, y=VALOR))+
+  geom_segment( aes(x=TYPE, xend=TYPE, y=0, yend=VALOR)) +
+  geom_point( size=5, color="black", fill=alpha(OEFA.TURQUEZA, 0.3), alpha=0.7, shape=21, stroke=2)+
+  geom_shadowtext(aes(label = round(VALOR)),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 1.05), check_overlap = T)+
+  labs(x="", y="")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.x =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.text.x = element_blank(),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  coord_flip()
+
+G_0
+
+
+```
+
+[^PRE5]: El día 28 de septiembre de 2020 se hizo entrega oficial del  Registro de Seguimiento a CMIN, sin embargo, el registro cuenta con información de años previos. En el presente reporte se consigna la información de las medidas administrativas en el Registro de Seguimiento consignadas en resoluciones notificadas al administrado durante los últimos doce meses, mientras que en el caso de los recursos y variaciones, se consideran aquellas solicitudes/recursos que fueron resueltos durante el último año. 
+
+
+```{r out.width = "100%",fig.height=2.5,fig.align='center',fig.cap="\\label{FIG_2}Evolución mensual de medidas impuestas"}
+
+#```{r fig.align='center', fig.width=6, fig.height=6.5, fig.cap="\\label{Espaciosvacíos}Distribución de espacios vacíos y/o celdas NA en el Registro"}
+
+
+GRAF_1=ggplot(PRE_TAB_II_5,aes(x=FECHA))+
+  geom_bar(stat="identity",aes(y=`Resoluciones emitidas`), fill=OEFA.AZUL1)+
+  geom_shadowtext(aes(x=FECHA,y=`Resoluciones emitidas`, label = round(`Resoluciones emitidas`,digits = 0)),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 1.2), check_overlap = T)+
+  labs(x="Fecha",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_rotate_x_labels(angle = 90)+
+  ggeasy::easy_plot_legend_size(size=10)+
+  scale_x_date(date_labels = "%b",breaks = "1 month", expand = c(0.01,0))
+
+
+GRAF_1
+
+
+```
+
+
+### Estado general de la medidas administrativas, recursos y variaciones
+
+2. En cuanto al modo de dictado de las medidas administrativas en los últimos doce (12) meses, se han identificado que **`r subset(PRE_TAB_II_6)[1,2]`** han sido impuestas en campo y **`r subset(PRE_TAB_II_6)[2,2]`** en gabinete[^PRE6]. La siguiente figura muestra la distribución de las medidas impuestas por modo de dictado.
+
+
+```{r out.width = "100%",fig.height=3,fig.align='center',fig.cap="\\label{FIG_3}Modo de dictado de las medidas administrativas"}
+
+## -------------------------------- -
+## Generando tabla Medidas por tipo 
+## -------------------------------- -
+
+
+RATIO=0.6 #El % que representa espacio interno de la dona respecto al total 
+TAMAÑO=10 #Tamaño de la dona
+
+GRAF_2=ggplot(PRE_TAB_II_6,aes(x=TAMAÑO*(1+RATIO)/2, y=Medidas, fill=reorder(MOD_DICT,Medidas)))+
+  geom_col(width = (1-RATIO)*TAMAÑO,color="white",lwd=2)+ #,
+  coord_polar("y", start = 0) +
+  xlim(0, TAMAÑO)+
+  geom_shadowtext(aes(x=TAMAÑO,label = paste0(round(Porcentaje*100), "%")),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  labs(x="", y="",
+       ## title = "Resumen de las medidas por imponer, por estado",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10)) +
+  scale_fill_manual(values = c(OEFA.TURQUEZA,OEFA.AZUL1))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_legend_at("right")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+## guides(fill=guide_legend(nrow=1,byrow=TRUE,keyheight = 1.5))
+
+GRAF_2
+
+
+
+#####################
+
+
+```
+
+
+[^PRE6]: De acuerdo al artículo 12 del Reglamento de Supervisión, aprobado mediante Resolución de Consejo Directivo N° 006-2019-OEFA/CD, se indica los tipos de acciones de supervisión que se clasifican en: a) In situ: Acción de supervisión que se realiza fuera de las sedes de OEFA, en presencia del administrado o sin ella; y, b) En gabinete: Acción de supervisión que se realiza desde las sedes del OEFA y que implica el acceso y evaluación de información vinculadas a las actividades o funciones del administrado supervisado. Para efectos del presente informe, las acciones de supervisión in situ se denominan “de campo”, mientras que las de gabinete son “de gabinete”.
+
+
+3. Respecto al tipo de medida administrativa[^PRE7] impuesta, la siguiente figura muestra la cantidad de medidas impuestas de acuerdo a su tipo. 
+
+```{r out.width = "100%",fig.height=3,fig.align='center',fig.cap="\\label{FIG_4}Tipo de medidas impuestas"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 2
+## ---------------------------------- -
+
+
+GRAF_3=ggplot(PRE_TAB_II_7,aes(x=reorder(T_MEDIDA, Medidas)))+
+  geom_bar(stat="identity",aes(y=Medidas),fill=OEFA.TURQUEZA)+ #
+  coord_flip()+
+  
+  geom_shadowtext(aes(x=reorder(T_MEDIDA, -Medidas),y=Medidas, label = round(Medidas,digits = 1)),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 1.2), check_overlap = T)+
+  labs(x="", y="Días hábiles",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.x =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))
+
+
+GRAF_3
+
+
+
+```
+
+
+[^PRE7]: De acuerdo al artículo 22 del Reglamento de Supervisión, aprobado mediante Resolución de Consejo Directivo N° 006-2019-OEFA/CD, la autoridad de supervisión puede emitir las siguientes medidas administrativas: a) Mandato de carácter particular, b) Medida preventiva, c) Requerimientos sobre instrumentos de gestión ambiental; y, d) Otros mandatos dictados de conformidad con la Ley N° 29325, Ley del Sistema Nacional de Evaluación y Fiscalización Ambiental.
+
+4. Para facilitar el registro de información, se crearon 12 clases de medidas, cada una con sus verbos rectores correspondientes. En el siguiente cuadro y figura, se observa la frecuencia de uso de las clases de medidas y los verbos rectores por parte del equipo de CMIN en las resoluciones de imposición.
+
+\arrayrulecolor{black}
+```{r}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 3
+## ---------------------------------- -
+
+Tabla_1=
+  knitr::kable(PRE_TAB_II_8,caption = "\\label{TAB_1}Clases de medidas registradas en el Registro de Seguimiento", align= "lc", format = "latex") %>%
+kable_styling(font_size = 9, bootstrap_options = "bordered", latex_options = "HOLD_position", full_width = FALSE) %>%
+## kable_styling(bootstrap_options = "striped", full_width = F, position = "left") %>%
+column_spec(1 , latex_valign = "m", width = "10cm", border_left = T) %>%
+column_spec(2 , latex_valign = "m", width = "2cm", border_right = T) %>%
+## column_spec(3 , latex_valign = "m", width = "11.5cm") %>%
+## column_spec(4 , latex_valign = "m", width = "1cm", border_right = TRUE) %>%
+row_spec(0, bold = TRUE, color = "white", background = "black", align = "c")
+
+
+Tabla_1
+
+
+```
+
+
+```{r out.width = "100%",fig.height=3.5,fig.align='center',fig.cap="\\label{FIG_6}Cantidad de verbos rectores usados en el Registro de Seguimiento"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 4
+## ---------------------------------- -
+
+RATIO=0.6 #El % que representa espacio interno de la dona respecto al total 
+TAMAÑO=10 #Tamaño de la dona
+
+GRAF_5=ggplot(PRE_TAB_II_9,aes(x=TAMAÑO*(1+RATIO)/2, y=Medidas, fill=reorder(VERB,Medidas)))+
+  geom_col(width = (1-RATIO)*TAMAÑO,color="white",lwd=2)+ #,
+  coord_polar("y", start = 0) +
+  xlim(0, TAMAÑO)+
+  geom_shadowtext(aes(x=TAMAÑO,label = paste0(round(Porcentaje*100), "%")),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  labs(x="", y="",
+       ## title = "Resumen de las medidas por imponer, por estado",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10)) +
+  ## scale_fill_manual(values = c(OEFA.TURQUEZA,OEFA.AZUL1))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_legend_at("right")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+## guides(fill=guide_legend(nrow=1,byrow=TRUE,keyheight = 1.5))
+
+GRAF_5
+
+
+
+```
+
+5. En cuanto a la condición previa[^PRE8], de las **`r subset(PRE_TAB_II_X)[1,2]+subset(PRE_TAB_II_X)[2,2]`** obligaciones registradas, **`r subset(PRE_TAB_II_X)[2,2]`** cuentan con condición previa y **`r subset(PRE_TAB_II_X)[1,2]`** no cuentan con dicha condicionante. La siguiente figura muestra si las medidas administrativas impuestas en el periodo de análisis, registran o no una condición previa.
+
+```{r out.width = "100%",fig.height=3,fig.align='center',fig.cap="\\label{FIG_7}Condición previa"}
+
+RATIO=0.6 #El % que representa espacio interno de la dona respecto al total 
+TAMAÑO=10 #Tamaño de la dona
+
+GRAF_X=ggplot(PRE_TAB_II_X,aes(x=TAMAÑO*(1+RATIO)/2, y=Medidas, fill=COND_PREV_SN))+
+  geom_col(width = (1-RATIO)*TAMAÑO,color="white",lwd=2)+ #,
+  coord_polar("y", start = 0) +
+  xlim(0, TAMAÑO)+
+  geom_shadowtext(aes(x=TAMAÑO,label = paste0(round(Porcentaje*100), "%")),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  labs(x="", y="",
+       ## title = "Resumen de las medidas por imponer, por estado",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10)) +
+  scale_fill_manual(values = c(OEFA.TURQUEZA,OEFA.AZUL1))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_legend_at("right")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+## guides(fill=guide_legend(nrow=1,byrow=TRUE,keyheight = 1.5))
+
+GRAF_X
+
+
+```
+
+[^PRE8]: De acuerdo al artículo 22 del Reglamento de Supervisión, aprobado mediante Resolución de Consejo Directivo N° 006-2019-OEFA/CD, la autoridad de supervisión puede emitir las siguientes medidas administrativas: a) Mandato de carácter particular, b) Medida preventiva, c) Requerimientos sobre instrumentos de gestión ambiental; y, d) Otros mandatos dictados de conformidad con la Ley N° 29325, Ley del Sistema Nacional de Evaluación y Fiscalización Ambiental.
+
+
+6. Respecto al estado de seguimiento de las obligaciones de fondo, se ubicaron **`r sum(PRE_TAB_II_11[,c(2)])`** obligaciones registradas. La siguiente figura muestra el detalle del estado de seguimiento de las obligaciones de fondo.
+
+
+```{r out.width = "100%",fig.height=3,fig.align='center',fig.cap="\\label{FIG_8}Estado de seguimiento de obligaciones de fondo"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 5
+## ---------------------------------- -
+
+RATIO=0.6 #El % que representa espacio interno de la dona respecto al total 
+TAMAÑO=10 #Tamaño de la dona
+
+GRAF_6=ggplot(PRE_TAB_II_11,aes(x=TAMAÑO*(1+RATIO)/2, y=Medidas, fill=reorder(ESTADO_OB,Medidas)))+
+  geom_col(width = (1-RATIO)*TAMAÑO,color="white",lwd=2)+ #,
+  coord_polar("y", start = 0) +
+  xlim(0, TAMAÑO)+
+  geom_shadowtext(aes(x=TAMAÑO,label = paste0(round(Porcentaje*100), "%")),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  labs(x="", y="",
+       ## title = "Resumen de las medidas por imponer, por estado",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10)) +
+  scale_fill_manual(values = c(OEFA.MOSTAZA,OEFA.VERDE,OEFA.JADE,OEFA.TURQUEZA,OEFA.AZUL2,OEFA.AZUL1, OEFA.GRIS))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_legend_at("right")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+## guides(fill=guide_legend(nrow=1,byrow=TRUE,keyheight = 1.5))
+
+GRAF_6
+
+```
+
+7. Se han registrado **`r sum(PRE_TAB_II_12[,c(2)])`** obligaciones relacionadas a la presentación de informes de acreditación de periodicidad semanal, quincenal, mensual, semestral y anual, de los cuales **`r subset(PRE_TAB_II_12, ESTADO_SEG=="CUMPLIÓ FUERA DE PLAZO")[,c(2)]`** se entregaron fuera de plazo, **`r subset(PRE_TAB_II_12, ESTADO_SEG=="CUMPLIÓ EN PLAZO")[,c(2)]`** están en plazo, **`r subset(PRE_TAB_II_12, ESTADO_SEG=="EN PLAZO")[,c(2)]`** fueron cumplidas en plazo y **`r subset(PRE_TAB_II_12, ESTADO_SEG=="VENCIDO")[,c(2)]`** están vencidas. La siguiente figura muestra el estado de seguimiento de obligaciones de acreditación.
+
+```{r out.width = "100%",fig.height=3,fig.align='center',fig.cap="\\label{FIG_9}Estado de seguimiento de obligaciones de acreditación"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 6
+## ---------------------------------- -
+
+
+RATIO=0.6 #El % que representa espacio interno de la dona respecto al total 
+TAMAÑO=10 #Tamaño de la dona
+
+GRAF_7=ggplot(PRE_TAB_II_12,aes(x=TAMAÑO*(1+RATIO)/2, y=Medidas, fill=reorder(ESTADO_SEG,Medidas)))+
+  geom_col(width = (1-RATIO)*TAMAÑO,color="white",lwd=2)+ #,
+  coord_polar("y", start = 0) +
+  xlim(0, TAMAÑO)+
+  geom_shadowtext(aes(x=TAMAÑO,label = paste0(round(Porcentaje*100), "%")),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  labs(x="", y="",
+       ## title = "Resumen de las medidas por imponer, por estado",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10)) +
+  scale_fill_manual(values = c(OEFA.MOSTAZA,OEFA.TURQUEZA,OEFA.AZUL2,OEFA.AZUL1, OEFA.GRIS))+
+  ggeasy::easy_add_legend_title("")+
+  ggeasy::easy_legend_at("right")+
+  ggeasy::easy_plot_legend_size(size=10)#+
+## guides(fill=guide_legend(nrow=1,byrow=TRUE,keyheight = 1.5))
+
+GRAF_7
+
+
+```
+
+
+8. Se han registrado **`r sum(PRE_TAB_II_13[,c(3)])`** solicitudes de variaciones y recursos resueltos durante los últimos doce (12) meses. La siguiente figura muestra el detalle del tipo de solicitudes resueltas, según tipo de variación.
+
+
+```{r out.width = "100%",fig.height=4,fig.align='center',fig.cap="\\label{FIG_10}Detalle del tipo de solicitudes resueltas, según tipo de variación"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 7
+## ---------------------------------- -
+
+GRAF_8=ggplot(PRE_TAB_II_13,aes(x=SOLICITUD))+
+  geom_bar(stat="identity",aes(y=Medidas,fill=ESTADO))+ #
+  ## coord_flip()+
+  
+  geom_shadowtext(aes(x=SOLICITUD,y=Medidas, label = round(Medidas,digits = 1)),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  labs(x="Tipo de solicitud", y="Cantidad de solicitudes",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  scale_x_discrete(labels=str_wrap(PRE_TAB_II_13$SOLICITUD,width=2))+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.AZUL2,OEFA.VERDE, OEFA.AZUL1,OEFA.GRIS,OEFA.MOSTAZA))
+  
+  
+
+GRAF_8
+
+
+```
+
+
+### Producción y tiempos del personal
+
+9. Esta sección se enfoca en la cantidad de registros que hubo en el Registro de Seguimiento en los últimos doce (12) meses, según la cantidad de obligaciones de fondo, de acreditación y estado de la medida por jefe de equipo. Asimismo, también se consigna el plazo de atención de las variaciones o recursos atendidos por CMIN.
+
+
+10. Las **`r sum(PRE_TAB_II_14[,c(2)])`** obligaciones fueron atendidas por un grupo de **`r nrow(PRE_TAB_II_14)`** jefes de equipo. La siguiente figura muestra la cantidad de obligaciones de fondo verificadas por cada jefe de equipo.
+
+
+```{r out.width = "100%",fig.height=4,fig.align='center',fig.cap="\\label{FIG_11}Cantidad de obligaciones de fondo por jefe de equipo"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 8
+## ---------------------------------- -
+
+GRAF_9=ggplot(PRE_TAB_II_14,aes(x=reorder(RESP,-Medidas)))+
+  geom_bar(stat="identity",aes(y=Medidas), fill=OEFA.AZUL1)+ #
+  ## coord_flip()+
+  
+  geom_shadowtext(aes(x=RESP,y=Medidas, label = round(Medidas,digits = 0)),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 1.1), check_overlap = T)+
+  labs(x="Responsables", y="Cantidad de obligaciones",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  scale_x_discrete(labels=str_wrap(PRE_TAB_II_14$RESP,width=2))+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))#+
+
+
+GRAF_9
+
+
+```
+
+11. El estado de las medidas adoptadas respecto de las obligaciones de fondo pueden ser: a) verificado en plazo[^PRE9], b) no amerita seguimiento, c) pendiente de cumplir condición, d) en plazo, e) vencido; y, f) verificado fuera de plazo[^PRE10]. La siguiente figura desagrega la situación de las obligaciones de fondo por cada jefe de equipo, indicando el estado en que se encuentran.
+
+```{r out.width = "100%",fig.height=8,fig.align='center',fig.cap="\\label{FIG_12}Estados de las obligaciones de fondo por jefe de equipo"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 9
+## ---------------------------------- -
+
+RATIO=0.6 #El % que representa espacio interno de la dona respecto al total
+TAMAÑO=10 #Tamaño de la dona
+
+GRAF_10=ggplot(PRE_TAB_II_15,aes(x=TAMAÑO*(1+RATIO)/2, y=Porcentaje, fill=Estado))+
+  geom_col(width = (1-RATIO)*TAMAÑO,color="white",lwd=2)+ #,
+  coord_polar("y", start = 0) +
+  xlim(0, TAMAÑO)+
+  geom_shadowtext(aes(x=TAMAÑO,label = paste0(round(Porcentaje*100), "%")),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  labs(x="", y="",
+       ## title = "Resumen de las medidas por imponer, por estado",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 0.5, size = 11),
+        plot.caption = element_text(hjust = 0,size=10)) +
+  scale_fill_manual(values = c(OEFA.MOSTAZA,OEFA.TURQUEZA,OEFA.JADE,OEFA.AZUL2,OEFA.VERDE, OEFA.AZUL1,OEFA.GRIS))+
+  ggeasy::easy_add_legend_title("")+
+  guides(fill=guide_legend(nrow=2,byrow=TRUE))+
+  ## guides(col = guide_legend(ncol = ))+
+  ggeasy::easy_legend_at("bottom")+
+  ggeasy::easy_plot_legend_size(size=10)+
+  facet_wrap(~ Responsable, ncol = 3)
+## guides(fill=guide_legend(nrow=1,byrow=TRUE,keyheight = 1.5))
+
+GRAF_10
+
+
+```
+
+[^PRE9]: En la figura se debe entender que el término “verificado en plazo” implica que el equipo de supervisión de CMIN realiza la verificación dentro del plazo indicado en la medida administrativa, previo a su vencimiento. 
+
+[^PRE10]: En la figura se debe entender que el término “verificado fuera de plazo” implica que el equipo de supervisión realiza la verificación en campo, luego de vencido el plazo para que el administrado cumpla con la medida.
+
+12. Las **`r sum(PRE_TAB_II_16[,c(2)])`** obligaciones de acreditación registradas se encuentran bajo seguimiento de **`r nrow(PRE_TAB_II_16)`** jefes de equipo. La siguiente figura muestra la cantidad de obligaciones de acreditación por jefe de equipo.
+
+```{r out.width = "100%",fig.height=3,fig.align='center',fig.cap="\\label{FIG_13}Cantidad de obligaciones de acreditación por jefe de equipo"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 10
+## ---------------------------------- -
+
+GRAF_11=ggplot(PRE_TAB_II_16)+
+  geom_bar(stat="identity",aes(x=RESP,y=Medidas,fill=OEFA.AZUL1))+
+  ## coord_flip()+
+  
+  geom_shadowtext(aes(x=RESP,y=Medidas, label = Medidas),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  
+  labs(x="Responsable", y="Cantidad de obligaciones",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  scale_x_discrete(labels=str_wrap(PRE_TAB_II_16$RESP,width=2))+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.MOSTAZA))+
+  ggeasy::easy_x_axis_labels_size(size = 8)
+  ## ggeasy::easy_rotate_x_labels(angle = 45,side = "right")
+
+
+GRAF_11
+
+
+```
+
+
+13. En cuanto al estado de las obligaciones de acreditación, en la siguiente figura se muestra el detalle del estado de las medidas adoptadas por cada jefe de equipo[^PRE11].
+
+```{r out.width = "100%",fig.align='center',fig.cap="\\label{FIG_14}Estado de las obligaciones de acreditación por jefe de equipo"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 11
+## ---------------------------------- -
+
+GRAF_12=ggplot(PRE_TAB_II_17,aes(x=RESP,y=Medidas,fill=ESTADO_SEG))+
+  geom_bar(stat="identity")+ #
+  ## coord_flip()+
+  scale_x_discrete(labels=str_wrap(unique(PRE_TAB_II_17$RESP),width=2))+
+  
+  geom_shadowtext(aes(x=RESP,y=Medidas, label = round(Medidas,digits = 1)),
+                  color="white", fontface="bold", size=5,
+                  position = position_stack(vjust = 0.5), check_overlap = T)+
+  labs(x="Responsable", y="Cantidad de obligaciones",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.VERDE,OEFA.TURQUEZA,OEFA.AZUL2,OEFA.AZUL1, OEFA.GRIS))+
+  ## ggeasy::easy_rotate_x_labels(angle = 45,side = "right")+
+  ggeasy::easy_add_legend_title("Estado")
+
+
+
+GRAF_12
+
+
+```
+
+[^PRE11]: El estado de la acreditación depende enteramente del cumplimiento de la obligación por parte del administrado.
+
+14. Asimismo, en relación a los plazos establecidos para la atención de las solicitudes de recursos o variaciones, se ha evaluado el tiempo en que el equipo de CMIN logra emitir las resoluciones que resuelven los recursos o variaciones de medidas administrativas presentados por el administrado, en comparación con los plazos fijados para su cumplimiento[^PRE12]. En la siguiente figura se observa el detalle de los plazos de atención (en días hábiles) de los recursos o variaciones por parte de CMIN.
+
+
+```{r out.width = "100%",fig.height=3,fig.align='center',fig.cap="\\label{FIG_15}Plazos de atención de los recursos o variaciones"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 12
+## ---------------------------------- -
+
+GRAF_13=ggplot(PRE_TAB_II_18,aes(x=SOLICITUD,y=VALOR,fill=TYPE))+
+  geom_bar(stat="identity",position=position_dodge())+
+  ## coord_flip()+
+  
+  geom_shadowtext(aes(x=SOLICITUD,y=VALOR, label = VALOR),position = position_dodge(0.9),
+                  vjust=-0.1,color="white", fontface="bold", size=5, check_overlap = T)+
+  
+  ## geom_text(aes(label=VALOR), vjust=1.6, color="white",
+  ##           position = position_dodge(0.9), size=3.5)+
+
+
+    labs(x="Tipo de solicitud", y="Días hábiles",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  scale_x_discrete(labels=str_wrap(PRE_TAB_II_18$SOLICITUD,width=2))+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.VERDE,OEFA.TURQUEZA, OEFA.GRIS))+
+  ## ggeasy::easy_rotate_x_labels(angle = 45,side = "right")+
+  ggeasy::easy_add_legend_title("Estado")
+
+
+
+GRAF_13
+
+
+```
+
+[^PRE12]: Los plazos de atención de las solicitudes de atención de recursos o variaciones fueron fijados en octubre del 2020.
+
+15. Además, en relación a los plazos de atención de las solicitudes de variaciones por jefe de equipo. En las Figuras 15 y 16 se observa el detalle de los plazos de atención (en días hábiles) de los recursos o variaciones según jefe de equipo.
+
+
+```{r out.width = "100%",fig.height=3,fig.align='center',fig.cap="\\label{FIG_15}Plazos de atención de los recursos o variaciones"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 12
+## ---------------------------------- -
+GRAF_13=ggplot(PRE_TAB_II_23,aes(x=RESP,y=`Plazo logrado`,fill=OEFA.AZUL1))+
+  geom_bar(stat="identity",position=position_dodge())+
+  ## coord_flip()+
+  
+  geom_shadowtext(aes(x=RESP,y=`Plazo logrado`, label = `Plazo logrado`),position = position_dodge(0.9),
+                  vjust=-0.1,color="white", fontface="bold", size=5, check_overlap = T)+
+  
+  ## geom_text(aes(label=VALOR), vjust=1.6, color="white",
+  ##           position = position_dodge(0.9), size=3.5)+
+
+
+    labs(x="", y="Plazo logrado",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  scale_x_discrete(labels=str_wrap(PRE_TAB_II_23$RESP,width=2))+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.VERDE,OEFA.TURQUEZA))
+  ## ggeasy::easy_rotate_x_labels(angle = 45,side = "right")+
+  # ggeasy::easy_add_legend_title("Estado")
+
+
+
+GRAF_13
+
+
+```
+
+```{r out.width = "100%",fig.height=4,fig.align='center',fig.cap="\\label{FIG_15}Plazos de atención de los recursos o variaciones"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 12
+## ---------------------------------- -
+
+GRAF_13=ggplot(PRE_TAB_II_24,aes(x=RESP,y=`Plazo logrado`,fill=SOLICITUD))+
+  geom_bar(stat="identity",position=position_dodge())+
+  ## coord_flip()+
+  
+  geom_shadowtext(aes(x=RESP,y=`Plazo logrado`, label = `Plazo logrado`),position = position_dodge(0.9),
+                  vjust=-0.1,color="white", fontface="bold", size=5, check_overlap = T)+
+  
+  ## geom_text(aes(label=VALOR), vjust=1.6, color="white",
+  ##           position = position_dodge(0.9), size=3.5)+
+
+
+    labs(x="Tipo de solicitud", y="Días hábiles",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  scale_x_discrete(labels=str_wrap(PRE_TAB_II_24$RESP,width=2))+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        ## legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(PALETA.PRINCIPAL))+
+  ## ggeasy::easy_rotate_x_labels(angle = 45,side = "right")+
+  ggeasy::easy_add_legend_title("Estado")
+
+
+
+GRAF_13
+
+
+```
+
+
+## INFORMACIÓN QUE CONTRIBUYE A IDENTIFICAR ERRORES DE LLENADO EN EL REGISTRO
+
+### Composición del Registro
+
+16. El Registro de Seguimiento se divide en las siguientes pestañas:
+
+* Lista de medidas administrativas: contiene la relación de medidas impuestas 
+* Obligaciones: listado de obligaciones de fondo por medida administrativa
+* Acreditación: listado de obligaciones de acreditación por medida administrativa.
+* Variaciones/Recursos: listado de variaciones o recursos sobre medidas administrativas impuestas.
+
+
+17. Las pestañas en mención están compuestas por un total de 92 columnas. En el Cuadro 2 de los anexos se proporciona una lista con los nombres de todas las columnas según la pestaña en la que se encuentran.
+
+
+18. Al cierre del presente informe, las pestañas de “Lista de medidas administrativas”, “Obligaciones”, “Acreditación” y “Recursos/variaciones” se encuentran en constante llenado por el área usuaria, así como también se vienen implementando diversas oportunidades de mejora que se observan a través de la práctica.
+
+
+### Conteo de espacios vacíos y/o celdas “NA”
+
+19. Para facilitar la identificación de posibles errores de llenado del Registro de Seguimiento de medidas administrativas se ejecutó la siguiente acción: conteo de espacios vacíos y/o celdas “NA”.
+
+20. Existen **`r sum(PRE_TAB_II_19[,c(2)])+sum(PRE_TAB_II_20[,c(2)])+sum(PRE_TAB_II_21[,c(2)])+sum(PRE_TAB_II_22[,c(2)])`** espacios vacíos y/o celdas “NA” en todas las pestañas del Registro de Seguimiento. La distribución de espacios vacíos y/o celdas “NA” en el registro se observa en las siguientes 4 gráficas.
+
+
+```{r out.width = "100%",fig.align='center',fig.cap="\\label{FIG_17}Distribución de espacios vacíos y/o celdas NA en la pestaña: Lista de medidas administrativas"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 13
+## ---------------------------------- -
+
+GRAF_14=ggplot(PRE_TAB_II_19,aes(x=Columna,y=Cantidad, fill=OEFA.AZUL1))+
+  geom_col()+
+  coord_flip()+
+  
+  geom_shadowtext(aes(x=Columna,y=Cantidad, label = Cantidad),hjust=-0.5,
+                  vjust=0.5,color="white", fontface="bold", size=5, check_overlap = T)+
+  
+
+  labs(x="Nombre de columnas", y="Cantidad de vacios",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.TURQUEZA))+
+  scale_y_continuous(limits = c(0, 4), breaks = seq(0,4,1), expand = c(0, 0))+
+  ggeasy::easy_rotate_x_labels(angle = 45,side = "right")+
+  ggeasy::easy_add_legend_title("Estado")
+
+GRAF_14
+
+```
+
+```{r out.width = "100%",fig.height=10,fig.align='center',fig.cap="\\label{FIG_18}Distribución de espacios vacíos y/o celdas NA en la pestaña: Obligaciones"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 14
+## ---------------------------------- -
+
+GRAF_15=ggplot(PRE_TAB_II_20,aes(x=Columna,y=Cantidad, fill=OEFA.AZUL1))+
+  geom_col()+
+  coord_flip()+
+  
+  geom_shadowtext(aes(x=Columna,y=Cantidad, label = Cantidad),hjust=-0.5,
+                  vjust=0.5,color="white", fontface="bold", size=5, check_overlap = T)+
+  
+  
+  labs(x="Nombre de columnas", y="Cantidad de vacios",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.VERDE))+
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0,100,10), expand = c(0, 0))+
+  ggeasy::easy_rotate_x_labels(angle = 45,side = "right")+
+  ggeasy::easy_add_legend_title("Estado")
+
+
+
+GRAF_15
+
+```
+
+```{r out.width = "100%",fig.align='center',fig.cap="\\label{FIG_19}Distribución de espacios vacíos y/o celdas NA en la pestaña: Acreditación"}
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 15
+## ---------------------------------- -
+
+GRAF_16=ggplot(PRE_TAB_II_21,aes(x=Columna,y=Cantidad, fill=OEFA.AZUL1))+
+  geom_col()+
+  coord_flip()+
+  
+  geom_shadowtext(aes(x=Columna,y=Cantidad, label = Cantidad),hjust=-0.5,
+                  vjust=0.5,color="white", fontface="bold", size=5, check_overlap = T)+
+  
+  
+  labs(x="Nombre de columnas", y="Cantidad de vacios",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.AZUL2))+
+  scale_y_continuous(limits = c(0, 70), breaks = seq(0,70,10), expand = c(0, 0))+
+  ggeasy::easy_rotate_x_labels(angle = 45,side = "right")+
+  ggeasy::easy_add_legend_title("Estado")
+
+
+
+GRAF_16
+
+
+```
+
+```{r out.width = "100%",fig.align='center',fig.cap="\\label{FIG_20}Distribución de espacios vacíos y/o celdas NA en la pestaña: Recursos/variaciones"}
+
+
+## ---------------------------------- -
+## Generando tabla Medidas por tipo 16
+## ---------------------------------- -
+
+GRAF_17=ggplot(PRE_TAB_II_22,aes(x=Columna,y=Cantidad, fill=OEFA.AZUL1))+
+  geom_col()+
+  coord_flip()+
+  
+  geom_shadowtext(aes(x=Columna,y=Cantidad, label = Cantidad),hjust=-0.5,
+                  vjust=0.5,color="white", fontface="bold", size=5, check_overlap = T)+
+  
+  
+  labs(x="Nombre de columnas", y="Cantidad de vacios",
+       ## title = "Duración promedio del procedimiento de imposición de medidas administrativas",
+       ## subtitle = paste0("(Del ",format(Inicio, format = "%d/%m/%Y")," al ",format(Fin, format = "%d/%m/%Y"),")"),
+       caption = "Fuente: CMIN")+
+  theme(panel.background = element_blank(),
+        panel.grid.major.y =element_line(size = 0.2, linetype = 1,colour = "grey95"),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(face="bold",hjust = 0.5, size = 12),
+        plot.subtitle = element_text(hjust = 1, size = 11),
+        plot.caption = element_text(hjust = 0,size=10),
+        axis.line = element_line(colour = "black",color="black", arrow =arrow(angle = 30,length = unit(.1,"inches"),type = "closed")))+
+  scale_fill_manual(values = c(OEFA.GRIS))+
+  ggeasy::easy_rotate_x_labels(angle = 45,side = "right")+
+  ggeasy::easy_add_legend_title("Estado")
+
+
+
+GRAF_17
+
+TAB_1_AUX=TAB_1
+
+```
+
+
+21. Por si sola, esta información no permite identificar errores en el llenado del registro. Sin embargo, debería servir de insumo para verificar los espacios vacíos y/o celdas “NA” de las columnas respecto de las que se sospeche que esta situación puede ser incorrecta.
+
+22. Es necesario indicar que la información consignada en las pestañas “Obligaciones”, “Acreditación” y “Variaciones/Recursos” responde a un proceso lógico, es por ello que la presencia de celdas vacías afectaría el proceso establecido. Por lo que, en algunos casos las celdas pueden encontrarse vacías debido a que se está a la espera de determinada información.
+
+\newpage
+
+
+# CONCLUSIONES
+
+## IMPOSICIONES
+
+23. En atención a lo expuesto en el presente documento, es posible llegar a las siguientes conclusiones:
+
+Sobre la información registrada en el registro durante los últimos doce (12) meses
+
+- A la fecha, el Equipo de Imposición de Medidas Administrativas ha registrado un total de **`r (T_INFO_GENERAL[,c(1)])`** proyectos de medidas administrativas, de las cuales **`r (T_INFO_GENERAL[,c(2)])`** **`r paste0(round(T_INFO_GENERAL[,c(2)]/T_INFO_GENERAL[,c(1)], digits = 3)*100,"%")`** han sido impuestas.
+
+- El plazo promedio del procedimiento de imposición completo es de **`r ceiling(T_INFO_GENERAL[,c(3)])`** días hábiles y el plazo de elaboración de proyecto es de **`r ceiling(T_INFO_GENERAL[,c(4)])`** días hábiles. Respecto a los plazos promedio en cada etapa, se tienen lo siguientes datos:
+
+    + Proceso previo: **`r ceiling(T_INFO_GENERAL[,c(5)])`** días
+    + Elaboración del proyecto por parte del especialista: **`r ceiling(T_TIEMPOS_ETAPA[1,c(4)])`** días
+    + Revisión del analista legal: **`r ceiling(T_TIEMPOS_ETAPA[2,c(4)])`** días 
+    + Revisión del coordinador de actividad: **`r ceiling(T_TIEMPOS_ETAPA[3,c(4)])`** días 
+    + Revisión del coordinador de medidas administrativas (DSEM): **`r ceiling(T_TIEMPOS_ETAPA[4,c(4)])`** días
+    + Revisión PCD: **`r ceiling(T_TIEMPOS_ETAPA[5,c(4)])`** días 
+    + Firma DSEM: **`r ceiling(T_TIEMPOS_ETAPA[6,c(4)])`** día
+
+Sobre la información que contribuye a identificar errores en el llenado del registro
+
+- En cuanto al llenado de las celdas, es necesario mencionar que algunas se encuentran vacías debido a que se está a la espera de aprobación de una de las etapas de elaboración.
+
+
+## SEGUIMIENTO
+
+24. En atención a lo expuesto en el presente documento, es posible llegar a las siguientes conclusiones:
+
+Sobre la información en el registro durante los últimos doce meses
+
+- Durante los últimos doce (12) meses, el equipo de seguimiento de medidas administrativas ha identificado la siguiente información:
+
+    + **`r sum(PRE_TAB_II_X[,c(2)])`** medidas administrativas, que contienen **`r subset(TAB_1_AUX)[3,2]`** obligaciones de fondo y **`r subset(TAB_1_AUX)[4,2]`** obligaciones de acreditación. 
+    + En el modo de dictado, **`r subset(PRE_TAB_II_X)[1,2]`** fueron dictadas en gabinete y **`r subset(PRE_TAB_II_X)[2,2]`** en campo.
+    + La clase de medida usada más frecuentemente es **`r subset(PRE_TAB_II_9)[1,1]`**
+    (**`r subset(PRE_TAB_II_9)[1,2]`** veces); mientras que el verbo rector más utilizado es “implementar” (18 veces)
+
+- Respecto a las obligaciones de fondo se ha identificado la siguiente información:
+
+    + Sobre la condición previa, se ha identificado que **`r subset(PRE_TAB_II_X)[1,2]`** obligaciones si cuentan con la condicionante respectiva, mientras que **`r subset(PRE_TAB_II_X)[2,2]`** no.
+    + En relación al estado del seguimiento de las obligaciones de fondo: se cuenta con **`r subset(PRE_TAB_II_11)[6,2]`** verificadas fuera de plazo, **`r subset(PRE_TAB_II_11)[4,2]`** vencidas, **`r subset(PRE_TAB_II_11)[1,2]`** en plazo, **`r subset(PRE_TAB_II_11)[3,2]`** pendientes cumplir condición, **`r subset(PRE_TAB_II_11)[2,2]`** no ameritan seguimiento; y, **`r subset(PRE_TAB_II_11)[5,2]`** verificadas en plazo.
+    + Se cuenta con **`r nrow(PRE_TAB_II_14)`** jefes de equipo que verifican las obligaciones de fondo. 
+
+- Respecto a las obligaciones de acreditación se ha identificado la siguiente información:
+
+    + En relación al estado de seguimiento, **`r subset(PRE_TAB_II_12)[2,2]`** obligaciones de acreditación fueron cumplidas fuera de plazo, **`r subset(PRE_TAB_II_12)[3,2]`** en plazo, **`r subset(PRE_TAB_II_12)[1,2]`**  cumplió en plazo y **`r subset(PRE_TAB_II_12)[4,2]`**  vencieron. 
+    + Se cuenta con **`r nrow(PRE_TAB_II_14)`** jefes de equipo que verifican las obligaciones de acreditación.
+
+- Finalmente, respecto a los recursos y variaciones se ha identificado la siguiente información:
+
+    + Se han registrado un total de **`r sum(PRE_TAB_II_13[,c(3)])`** solicitudes de variaciones y recursos resueltos por CMIN durante los últimos doce (12) meses. Respecto al estado de las solicitudes, 11 han sido atendidas fuera de plazo y 12 atendidas en plazo. 
+
+
+Sobre la información que contribuye a identificar errores en el llenado del registro
+
+- En cuanto al llenado de las celdas, es necesario mencionar que algunas se encuentran vacías debido a que se está a la espera de acciones que permitan verificar el cumplimiento de las medidas. Sin embargo, se recomienda verificar si existen celdas vacías debido a la falta de actualización del registro por parte del equipo de CMIN.
+
+
+\newpage
+
+# ANEXOS
+
+\arrayrulecolor{black}
+```{r}
+
+## ---------------------------------- -
+## Generando tabla
+## ---------------------------------- -
+
+TAB_1=knitr::kable(DIC_TABLA_1[,c(1,3,4,8)],caption = "\\label{TAB_2}Lista de columnas según pestañas del Registro de Seguimiento", align= "llll", format = "latex",longtable = T) %>%
+kable_styling(font_size = 9, bootstrap_options = "bordered", latex_options = c("hold_position"), full_width = FALSE,) %>%
+## kable_styling(bootstrap_options = "striped", full_width = F, position = "left") %>%
+column_spec(1 , latex_valign = "m", width = "3cm", border_left = T) %>%
+column_spec(2 , latex_valign = "m", width = "4cm") %>%
+column_spec(3 , latex_valign = "m", width = "3cm") %>%
+column_spec(4 , latex_valign = "m", width = "3cm", border_right = T) %>%
+row_spec(0, bold = TRUE, color = "white", background = "black", align = "c")
+
+TAB_1
+
+
+```
+
+
+\arrayrulecolor{black}
+```{r}
+
+## ---------------------------------- -
+## Generando tabla
+## ---------------------------------- -
+
+TAB_2=knitr::kable(DIC_TABLA_2[,c(1:3,6)],caption = "\\label{TAB_2}Lista de columnas según pestañas del Registro de Seguimiento", align= "llll", format = "latex",longtable = T) %>%
+kable_styling(font_size = 9, bootstrap_options = "bordered", latex_options = c("hold_position"), full_width = FALSE,) %>%
+## kable_styling(bootstrap_options = "striped", full_width = F, position = "left") %>%
+column_spec(1 , latex_valign = "m", width = "3cm", border_left = T) %>%
+column_spec(2 , latex_valign = "m", width = "4cm") %>%
+column_spec(3 , latex_valign = "m", width = "3cm") %>%
+column_spec(4 , latex_valign = "m", width = "3cm", border_right = T) %>%
+row_spec(0, bold = TRUE, color = "white", background = "black", align = "c")
+
+TAB_2
+
+
+```
+
+
+
+
+
+
+
+
+
