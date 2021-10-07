@@ -1,5 +1,5 @@
 # FOE: Proyecto de Comunicaciones CMIN
-Implementación de herramientas para la sistematización y optimización de la imposición y seguimiento de medidas administrativas de CMIN. El proyecto consta de tres ámbitos:
+Se cuenta con herramientas para la sistematización y optimización de la imposición y seguimiento de medidas administrativas de CMIN. El proyecto consta de tres ámbitos:
 1. Imposición de medidas administrativas
 2. Seguimiento de medidas administrativas
 3. Multas coercitivas
